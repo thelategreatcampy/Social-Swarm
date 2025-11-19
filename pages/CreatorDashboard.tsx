@@ -6,6 +6,7 @@ import { store } from '../services/mockStore';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { copyToClipboard } from '../utils/security';
+import { Check, Copy, Link as LinkIcon } from 'lucide-react';
 
 export const CreatorDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -18,6 +19,7 @@ export const CreatorDashboard: React.FC = () => {
   // Guidelines Modal State
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [agreedToGuidelines, setAgreedToGuidelines] = useState(false);
+  const [copiedState, setCopiedState] = useState<string | null>(null);
   
   useEffect(() => {
     if (user) {
@@ -42,9 +44,13 @@ export const CreatorDashboard: React.FC = () => {
     addToast(`Request Sent to ${selectedCampaign.businessName}. Awaiting Link Assignment.`, 'success');
   };
 
-  const handleCopy = async (text: string) => {
+  const handleCopy = async (text: string, linkId: string) => {
     const success = await copyToClipboard(text);
-    if (success) addToast('Link copied to clipboard', 'success');
+    if (success) {
+        setCopiedState(linkId);
+        addToast('Link copied to clipboard', 'success');
+        setTimeout(() => setCopiedState(null), 2000);
+    }
   };
 
   const getLinkForCampaign = (campaignId: string) => myLinks.find(l => l.campaignId === campaignId);
@@ -186,12 +192,27 @@ export const CreatorDashboard: React.FC = () => {
                   ) : (
                     <div className="space-y-4">
                         <div className="bg-neon-green/5 border border-neon-green/30 p-4 relative">
-                        <div className="flex items-center gap-2 mb-2">
-                            <i className="fas fa-bolt text-neon-green animate-pulse"></i>
-                            <p className="text-xs text-neon-green font-bold uppercase tracking-widest">Link Active</p>
-                        </div>
-                        <div className="bg-black border border-gray-700 p-2 text-[10px] break-all font-mono text-gray-300 mb-3 select-all shadow-inner">{existingLink.destinationUrl}</div>
-                        <button onClick={() => handleCopy(existingLink.destinationUrl)} className="w-full text-center bg-neon-green text-black py-2 hover:bg-white text-xs font-bold font-mono uppercase tracking-wider transition-colors">Copy Link</button>
+                            <div className="flex items-center gap-2 mb-3">
+                                <i className="fas fa-bolt text-neon-green animate-pulse"></i>
+                                <p className="text-xs text-neon-green font-bold uppercase tracking-widest">Link Active</p>
+                            </div>
+                            
+                            {/* Large Copy Button for Mobile Ease */}
+                            <button 
+                                onClick={() => handleCopy(existingLink.destinationUrl, existingLink.id)} 
+                                className={`w-full ${copiedState === existingLink.id ? 'bg-white text-black' : 'bg-neon-green hover:bg-neon-green/90 text-black'} font-bold py-4 px-6 rounded-md flex items-center justify-center gap-3 transition-all transform active:scale-95 shadow-[0_0_20px_rgba(57,255,20,0.4)] border-none outline-none`}
+                            >
+                                {copiedState === existingLink.id ? <Check className="text-green-600" size={24} /> : <LinkIcon size={24} />}
+                                <span className="text-sm md:text-base uppercase tracking-widest font-display">
+                                    {copiedState === existingLink.id ? 'COPIED!' : 'COPY AFFILIATE LINK'}
+                                </span>
+                            </button>
+                            
+                            <div className="text-center mt-3">
+                                <p className="text-[10px] text-gray-500 font-mono truncate select-all px-2">
+                                    {existingLink.destinationUrl}
+                                </p>
+                            </div>
                         </div>
                     </div>
                   )

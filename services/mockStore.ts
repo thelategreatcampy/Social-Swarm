@@ -131,9 +131,9 @@ class MockStore {
   private settings: SystemSettings = DEFAULT_SETTINGS;
   
   private vaultHandle: any = null; 
-  public isVaultConnected: boolean = false;
+  public isVaultConnected: boolean = true; // Defaulting to TRUE to use LocalStorage as Vault
   public vaultPermissionNeeded: boolean = false;
-  private saveDebounceTimer: NodeJS.Timeout | null = null;
+  private saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.initPersistence();
@@ -223,7 +223,12 @@ class MockStore {
   async connectVault(mode: 'OPEN' | 'CREATE' | 'RESUME'): Promise<boolean> {
      try {
        const win = window as any;
-       if (!win.showSaveFilePicker || !win.showOpenFilePicker) return false;
+       // If File System Access API is unavailable, return false but don't block operations (default is true)
+       if (!win.showSaveFilePicker || !win.showOpenFilePicker) {
+           console.warn("Vault: File System API unavailable in this browser.");
+           return false;
+       }
+       
        let handle;
        if (mode === 'RESUME') {
           handle = this.vaultHandle;

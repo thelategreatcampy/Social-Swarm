@@ -90,7 +90,7 @@ export const AdminDashboard: React.FC = () => {
           if (mode === 'RESUME') {
               addToast("Resume Failed. Please re-connect manually.", 'error');
           } else {
-              addToast("Vault Connection Failed.", 'error');
+              addToast("Vault Connection Failed. Using Local Storage.", 'info');
           }
       }
   };
@@ -105,46 +105,9 @@ export const AdminDashboard: React.FC = () => {
   const creatorPayoutsPaid = sales.filter(s => s.status === 'PAID').reduce((acc, s) => acc + s.creatorPay, 0);
   const activeDisputes = sales.filter(s => s.status === 'DISPUTED');
 
-  const isBlocked = !isVaultConnected || vaultPermissionNeeded;
-
   return (
     <div className="max-w-7xl mx-auto px-4 py-12 relative">
         
-        {/* SAFETY LOCKOUT MODAL */}
-        {isBlocked && (
-            <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-lg flex items-center justify-center p-8 text-center">
-                <div className="max-w-xl w-full border-4 border-neon-red p-12 bg-red-900/10 shadow-[0_0_100px_rgba(255,0,0,0.5)] relative overflow-hidden">
-                     <div className="absolute inset-0 scanlines opacity-50 pointer-events-none"></div>
-                     
-                     <i className="fas fa-lock text-8xl text-neon-red mb-8 animate-pulse"></i>
-                     <h1 className="text-4xl font-display font-black text-white uppercase tracking-widest mb-4">SECURITY LOCKDOWN</h1>
-                     
-                     <p className="text-neon-red font-mono text-lg mb-8 border-y border-neon-red/30 py-4">
-                        {vaultPermissionNeeded 
-                           ? "BROWSER PERMISSION EXPIRED. SYSTEM HALTED TO PREVENT DATA LOSS." 
-                           : "DATABASE VAULT NOT CONNECTED. OPERATIONS SUSPENDED."}
-                     </p>
-                     
-                     <div className="flex flex-col gap-4 max-w-xs mx-auto relative z-10">
-                        {vaultPermissionNeeded ? (
-                            <button onClick={() => handleConnectVault('RESUME')} className="bg-neon-yellow text-black font-bold py-4 uppercase font-mono hover:bg-white transition-colors shadow-[0_0_30px_rgba(252,238,10,0.4)] animate-pulse">
-                                >> RESUME CONNECTION
-                            </button>
-                        ) : (
-                            <>
-                                <button onClick={() => handleConnectVault('OPEN')} className="bg-neon-blue text-black font-bold py-3 uppercase font-mono hover:bg-white transition-colors">
-                                    MOUNT EXISTING DB
-                                </button>
-                                <button onClick={() => handleConnectVault('CREATE')} className="bg-transparent border border-gray-500 text-gray-400 py-3 uppercase font-mono hover:text-white hover:border-white transition-colors text-xs">
-                                    INITIALIZE NEW SYSTEM
-                                </button>
-                            </>
-                        )}
-                     </div>
-                </div>
-            </div>
-        )}
-
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start mb-8 border-b-4 border-neon-red pb-4 gap-4">
             <div>
@@ -154,10 +117,12 @@ export const AdminDashboard: React.FC = () => {
             
             {/* VAULT STATUS INDICATOR */}
             <div className="flex flex-col items-end gap-2">
-                 <div className="flex items-center gap-3 px-4 py-2 border bg-neon-green/10 border-neon-green">
-                    <div className="w-3 h-3 rounded-full bg-neon-green"></div>
+                 <div className={`flex items-center gap-3 px-4 py-2 border ${isVaultConnected ? 'bg-neon-green/10 border-neon-green' : 'bg-neon-yellow/10 border-neon-yellow'}`}>
+                    <div className={`w-3 h-3 rounded-full ${isVaultConnected ? 'bg-neon-green' : 'bg-neon-yellow animate-pulse'}`}></div>
                     <div>
-                        <p className="text-xs font-bold font-mono uppercase text-neon-green">VAULT: ONLINE (SYNCING)</p>
+                        <p className={`text-xs font-bold font-mono uppercase ${isVaultConnected ? 'text-neon-green' : 'text-neon-yellow'}`}>
+                            {isVaultConnected ? "VAULT: ONLINE" : "VAULT: LOCAL STORAGE"}
+                        </p>
                     </div>
                  </div>
                  <p className="text-[9px] text-gray-500 font-mono uppercase">Auto-Mirror: IndexedDB + HDD</p>

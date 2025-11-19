@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, TrendingUp, Users, Upload, Link as LinkIcon } from 'lucide-react';
+import { Plus, TrendingUp, Users, Upload, Copy, Check, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { useAuth } from '../contexts/AuthContext';
@@ -7,6 +7,7 @@ import { useToast } from '../contexts/ToastContext';
 import { store } from '../services/mockStore';
 import { Campaign, SaleRecord, AffiliateLink } from '../types';
 import { parseSalesCSV } from '../utils/validation';
+import { copyToClipboard } from '../utils/security';
 
 export const BusinessDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -17,6 +18,7 @@ export const BusinessDashboard: React.FC = () => {
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [myLinks, setMyLinks] = useState<AffiliateLink[]>([]);
   const [assignInputs, setAssignInputs] = useState<Record<string, {code: string, url: string}>>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   
   useEffect(() => {
     if (user) {
@@ -50,6 +52,15 @@ export const BusinessDashboard: React.FC = () => {
       store.assignLink(link.id, input.code, input.url);
       addToast('Link assigned to Creator successfully.', 'success');
       if(user) setMyLinks(store.getBusinessLinks(user.id));
+  };
+
+  const handleCopyLink = async (text: string, id: string) => {
+    const success = await copyToClipboard(text);
+    if (success) {
+      setCopiedId(id);
+      addToast('Link copied to clipboard', 'success');
+      setTimeout(() => setCopiedId(null), 2000);
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,6 +101,7 @@ export const BusinessDashboard: React.FC = () => {
   const triggerImport = () => { fileInputRef.current?.click(); };
   
   const pendingLinks = myLinks.filter(l => l.status === 'PENDING_ASSIGNMENT');
+  const activeLinks = myLinks.filter(l => l.status === 'ACTIVE');
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
@@ -107,39 +119,57 @@ export const BusinessDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Pending Requests Panel */}
+        {/* Pending Requests Panel - Spot to PROVIDE links */}
         {pendingLinks.length > 0 && (
-            <div className="bg-white rounded-xl shadow-md border-l-4 border-neon-pink mb-8 overflow-hidden">
-                <div className="p-6 border-b border-slate-200 bg-pink-50">
+            <div className="bg-white rounded-xl shadow-lg border-l-4 border-neon-pink mb-8 overflow-hidden ring-1 ring-black/5">
+                <div className="p-6 border-b border-slate-100 bg-pink-50/50">
                     <h2 className="text-lg font-bold text-pink-700 flex items-center gap-2">
-                        <Users size={20} /> Affiliate Link Requests ({pendingLinks.length})
+                        <Users size={20} /> 
+                        Assign Affiliate Links ({pendingLinks.length})
                     </h2>
-                    <p className="text-xs text-pink-600 mt-1">You must manually provide the unique affiliate link/code for these creators.</p>
+                    <p className="text-sm text-pink-600/80 mt-1">
+                        The following creators have applied. You must manually generate and assign their unique tracking links below.
+                    </p>
                 </div>
-                <div className="p-6 space-y-4">
+                <div className="p-6 space-y-4 bg-white">
                     {pendingLinks.map(link => {
                         const campaign = campaigns.find(c => c.id === link.campaignId);
                         return (
-                            <div key={link.id} className="bg-slate-50 p-4 rounded border border-slate-200 flex flex-col md:flex-row items-start md:items-center gap-4">
-                                <div className="w-full md:w-1/4">
-                                    <p className="font-bold text-slate-900">{link.creatorName}</p>
-                                    <p className="text-xs text-slate-500">For: {campaign?.productName}</p>
+                            <div key={link.id} className="bg-slate-50 p-6 rounded-lg border border-slate-200 flex flex-col lg:flex-row items-start lg:items-center gap-6 shadow-sm">
+                                <div className="w-full lg:w-1/4">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
+                                            {link.creatorName.substring(0,2).toUpperCase()}
+                                        </div>
+                                        <p className="font-bold text-slate-900">{link.creatorName}</p>
+                                    </div>
+                                    <p className="text-xs text-slate-500 pl-10">Application for: <span className="font-medium text-slate-700">{campaign?.productName}</span></p>
                                 </div>
-                                <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-2 w-full">
-                                    <input 
-                                        placeholder="Assign Code (e.g. SARAH20)" 
-                                        className="border p-2 rounded text-sm"
-                                        value={assignInputs[link.id]?.code || ''}
-                                        onChange={(e) => handleAssignChange(link.id, 'code', e.target.value)}
-                                    />
-                                    <input 
-                                        placeholder="Full Destination URL (e.g. https://site.com/?ref=sarah)" 
-                                        className="border p-2 rounded text-sm"
-                                        value={assignInputs[link.id]?.url || ''}
-                                        onChange={(e) => handleAssignChange(link.id, 'url', e.target.value)}
-                                    />
+                                <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Assign Discount Code</label>
+                                        <input 
+                                            placeholder="e.g. SARAH20" 
+                                            className="w-full border border-slate-300 p-2.5 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                            value={assignInputs[link.id]?.code || ''}
+                                            onChange={(e) => handleAssignChange(link.id, 'code', e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Full Tracking URL</label>
+                                        <input 
+                                            placeholder="e.g. https://site.com/?ref=sarah" 
+                                            className="w-full border border-slate-300 p-2.5 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                            value={assignInputs[link.id]?.url || ''}
+                                            onChange={(e) => handleAssignChange(link.id, 'url', e.target.value)}
+                                        />
+                                    </div>
                                 </div>
-                                <Button size="sm" onClick={() => handleSaveLink(link)}>Assign & Activate</Button>
+                                <div className="w-full lg:w-auto flex justify-end">
+                                    <Button size="md" onClick={() => handleSaveLink(link)} className="whitespace-nowrap shadow-md">
+                                        Confirm Assignment
+                                    </Button>
+                                </div>
                             </div>
                         );
                     })}
@@ -163,7 +193,7 @@ export const BusinessDashboard: React.FC = () => {
               <div className="p-3 bg-purple-50 text-purple-600 rounded-lg"><Users size={24} /></div>
               <div>
                 <p className="text-sm text-slate-500 font-medium">Active Affiliates</p>
-                <h3 className="text-2xl font-bold text-slate-900">{myLinks.filter(l => l.status === 'ACTIVE').length}</h3>
+                <h3 className="text-2xl font-bold text-slate-900">{activeLinks.length}</h3>
               </div>
             </div>
           </div>
@@ -178,10 +208,87 @@ export const BusinessDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Job Listings Section */}
+        {/* Active Operatives (Affiliate List) */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+            <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
+                <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Active Network Operatives</h2>
+                    <p className="text-sm text-slate-500">Manage assigned links for your creators.</p>
+                </div>
+            </div>
+            <div className="overflow-x-auto">
+                {activeLinks.length === 0 ? (
+                    <div className="p-12 text-center text-slate-500">
+                        <Users className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+                        <p>No active affiliates yet. Approve requests above.</p>
+                    </div>
+                ) : (
+                    <table className="min-w-full text-left text-sm">
+                        <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                            <tr>
+                                <th className="px-6 py-3 font-medium uppercase text-xs tracking-wider">Creator</th>
+                                <th className="px-6 py-3 font-medium uppercase text-xs tracking-wider">Campaign</th>
+                                <th className="px-6 py-3 font-medium uppercase text-xs tracking-wider">Assigned Code</th>
+                                <th className="px-6 py-3 font-medium uppercase text-xs tracking-wider">Tracking Link</th>
+                                <th className="px-6 py-3 font-medium uppercase text-xs tracking-wider">Performance</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200">
+                            {activeLinks.map(link => (
+                                <tr key={link.id} className="hover:bg-slate-50 transition-colors">
+                                    <td className="px-6 py-4 font-medium text-slate-900">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">
+                                                {link.creatorName.substring(0,1)}
+                                            </div>
+                                            {link.creatorName}
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-slate-600">
+                                        {campaigns.find(c => c.id === link.campaignId)?.productName}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className="bg-slate-100 border border-slate-200 rounded px-2 py-1 font-mono text-xs font-bold text-slate-700">
+                                            {link.code}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-2 group">
+                                            <div className="max-w-[200px] truncate text-slate-500 text-xs font-mono bg-slate-50 p-1 rounded border border-transparent group-hover:border-slate-200">
+                                                {link.destinationUrl}
+                                            </div>
+                                            <button 
+                                                onClick={() => handleCopyLink(link.destinationUrl, link.id)}
+                                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-all"
+                                                title="Copy Link"
+                                            >
+                                                {copiedId === link.id ? <Check size={14} /> : <Copy size={14} />}
+                                            </button>
+                                            <a 
+                                                href={link.destinationUrl} 
+                                                target="_blank" 
+                                                rel="noreferrer"
+                                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-all"
+                                            >
+                                                <ExternalLink size={14} />
+                                            </a>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-xs font-medium text-slate-600">
+                                        {link.clicks} Clicks
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+        </div>
+
+        {/* Active Campaigns */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
           <div className="p-6 border-b border-slate-200">
-            <h2 className="text-lg font-semibold text-slate-900">Active Campaigns</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Your Campaign Assets</h2>
           </div>
           <div className="divide-y divide-slate-200">
             {campaigns.map((campaign) => (
