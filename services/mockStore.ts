@@ -32,8 +32,16 @@ const MOCK_CAMPAIGNS: Campaign[] = [
     refundPolicy: 'FINAL_UPON_PAYMENT',
     contactPhone: '555-0199',
     status: 'ACTIVE',
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    validationMethod: 'Shopify Dashboard Sales Report',
+    advertisingGuidelines: 'Focus on processing speed and autonomous capabilities.',
+    prohibitedActs: 'Do not claim it is sentient. Do not use for illegal hacking.'
   }
+];
+
+const MOCK_LINKS: AffiliateLink[] = [
+    { id: 'lnk_1', campaignId: 'c_1', creatorId: 'u_creator_1', creatorName: 'Sarah Connor', code: 'SARAH2024', destinationUrl: 'https://cyberdyne.net?ref=sarah', clicks: 45, status: 'ACTIVE' },
+    { id: 'lnk_2', campaignId: 'c_1', creatorId: 'u_creator_2', creatorName: 'Neo Anderson', code: 'NEO1', destinationUrl: 'https://cyberdyne.net?ref=neo', clicks: 120, status: 'ACTIVE' }
 ];
 
 const MOCK_SALES: SaleRecord[] = [
@@ -47,37 +55,13 @@ const MOCK_SALES: SaleRecord[] = [
     saleAmount: 199.99,
     saleDate: new Date(Date.now() - 86400000 * 2).toISOString(),
     totalCommission: 50.00,
-    platformFee: 16.50,
-    creatorPay: 33.50,
+    platformFee: 15.00, // 30%
+    creatorPay: 35.00,  // 70%
     expectedPayoutDate: new Date(Date.now() + 86400000 * 5).toISOString(),
     status: 'PENDING',
     platformFeePaid: false,
     verificationMethod: 'MANUAL_ENTRY'
-  },
-  {
-    id: 'sale_002',
-    campaignId: 'c_1',
-    businessId: 'u_business_1',
-    creatorId: 'u_creator_2',
-    affiliateCode: 'NEO1',
-    productName: 'Neural Network CPU',
-    saleAmount: 199.99,
-    saleDate: new Date(Date.now() - 86400000 * 10).toISOString(),
-    totalCommission: 50.00,
-    platformFee: 16.50,
-    creatorPay: 33.50,
-    expectedPayoutDate: new Date(Date.now() - 86400000).toISOString(),
-    status: 'PAID',
-    platformFeePaid: true,
-    platformFeeTxId: 'tx_mock_123',
-    creatorPayTxId: 'tx_mock_456',
-    verificationMethod: 'CSV_IMPORT'
   }
-];
-
-const MOCK_LINKS: AffiliateLink[] = [
-    { id: 'lnk_1', campaignId: 'c_1', creatorId: 'u_creator_1', code: 'SARAH2024', generatedUrl: 'http://localhost/go?ref=SARAH2024', clicks: 45 },
-    { id: 'lnk_2', campaignId: 'c_1', creatorId: 'u_creator_2', code: 'NEO1', generatedUrl: 'http://localhost/go?ref=NEO1', clicks: 120 }
 ];
 
 const DEFAULT_SETTINGS: SystemSettings = {
@@ -146,7 +130,6 @@ class MockStore {
   private clickLogs: ClickLog[] = [];
   private settings: SystemSettings = DEFAULT_SETTINGS;
   
-  // Vault Handle (File System Access API)
   private vaultHandle: any = null; 
   public isVaultConnected: boolean = false;
   public vaultPermissionNeeded: boolean = false;
@@ -154,8 +137,6 @@ class MockStore {
 
   constructor() {
     this.initPersistence();
-    
-    // Cross-tab sync
     window.addEventListener('storage', (e) => {
       if (e.key === 'commish_store') {
         this.loadFromStorage();
@@ -364,6 +345,12 @@ class MockStore {
   getBusinessCampaigns(businessId: string) { return this.campaigns.filter(c => c.businessId === businessId); }
   getCampaignById(id: string) { return this.campaigns.find(c => c.id === id); }
   getCreatorLinks(creatorId: string) { return this.links.filter(l => l.creatorId === creatorId); }
+  getBusinessLinks(businessId: string) {
+      // Find all campaigns for this business
+      const myCampaignIds = this.campaigns.filter(c => c.businessId === businessId).map(c => c.id);
+      return this.links.filter(l => myCampaignIds.includes(l.campaignId));
+  }
+
   getLinkByCode(code: string) { return this.links.find(l => l.code.toUpperCase() === code.toUpperCase()); }
   findLinkForRedirect(creatorId: string, merchantName: string) {
     const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -377,7 +364,6 @@ class MockStore {
   banUser(userId: string) { this.users = this.users.filter(u => u.id !== userId); this.persist(); }
   resolveDispute(saleId: string, resolution: 'PAID' | 'PENDING') { const s = this.sales.find(s => s.id === saleId); if(s) { s.status = resolution; this.persist(); } }
   
-  // Updated to accept optional transaction ID
   adminVerifyPlatformFee(saleId: string, txId?: string) { 
     const s = this.sales.find(s => s.id === saleId); 
     if(s) { 
@@ -388,10 +374,37 @@ class MockStore {
   }
   
   addCampaign(campaign: Campaign) { this.campaigns.push(campaign); this.persist(); }
-  createLink(link: AffiliateLink) { this.links.push(link); this.persist(); }
+  
+  // Updated: Logic for requesting and assigning links
+  requestLink(campaignId: string, creatorId: string, creatorName: string): AffiliateLink {
+     const newLink: AffiliateLink = {
+         id: generateUUID(),
+         campaignId,
+         creatorId,
+         creatorName,
+         code: 'PENDING',
+         destinationUrl: '',
+         clicks: 0,
+         status: 'PENDING_ASSIGNMENT'
+     };
+     this.links.push(newLink);
+     this.persist();
+     return newLink;
+  }
+
+  assignLink(linkId: string, code: string, destinationUrl: string) {
+      const link = this.links.find(l => l.id === linkId);
+      if (link) {
+          link.code = code;
+          link.destinationUrl = destinationUrl;
+          link.status = 'ACTIVE';
+          this.persist();
+      }
+  }
+
   recordClick(linkId: string) { 
       const link = this.links.find(l => l.id === linkId); 
-      if(link) { 
+      if(link && link.status === 'ACTIVE') { 
           link.clicks = (link.clicks||0)+1; 
           this.clickLogs.push({ id: generateUUID(), creatorId: link.creatorId, merchantName: '?', timestamp: new Date().toISOString(), ipPlaceholder: '127.0.0.1' });
           this.persist();
@@ -400,14 +413,16 @@ class MockStore {
 
   recordSale(campaignId: string, affiliateCode: string, actualAmount?: number, verificationMethod: SaleRecord['verificationMethod'] = 'MANUAL_ENTRY'): SaleRecord | null {
     const campaign = this.campaigns.find(c => c.id === campaignId);
-    
-    // Basic validation that code belongs to campaign, but allow import if we can verify code ownership via link
     let link = this.links.find(l => l.code.toUpperCase() === affiliateCode.toUpperCase());
     
     if (!campaign || !link || link.campaignId !== campaign.id) return null;
 
     const amount = Math.max(0, actualAmount || campaign.productPrice);
     const totalCommission = formatCurrency(amount * (campaign.totalCommissionRate / 100));
+
+    // UPDATED SPLIT LOGIC: 70/30
+    const platformShare = 0.30;
+    const creatorShare = 0.70;
 
     const sale: SaleRecord = {
       id: generateUUID(),
@@ -419,8 +434,8 @@ class MockStore {
       saleAmount: formatCurrency(amount),
       saleDate: new Date().toISOString(),
       totalCommission,
-      platformFee: formatCurrency(totalCommission * (1/3)),
-      creatorPay: formatCurrency(totalCommission * (2/3)),
+      platformFee: formatCurrency(totalCommission * platformShare),
+      creatorPay: formatCurrency(totalCommission * creatorShare),
       expectedPayoutDate: this.calculatePayoutDate(campaign.paymentFrequency),
       status: 'PENDING',
       platformFeePaid: false,
@@ -441,15 +456,6 @@ class MockStore {
     if (sale) {
       sale.status = newStatus;
       if (txId) sale.creatorPayTxId = txId;
-      this.persist();
-    }
-  }
-
-  markPlatformFeePaid(saleId: string, txId?: string) {
-    const sale = this.sales.find(s => s.id === saleId);
-    if (sale) {
-      sale.platformFeePaid = true;
-      if (txId) sale.platformFeeTxId = txId;
       this.persist();
     }
   }

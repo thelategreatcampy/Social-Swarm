@@ -36,21 +36,28 @@ export interface Campaign {
   productPrice: number;
   description: string;
   targetUrl: string; // The actual landing page for the product
-  totalCommissionRate: number; // The total percentage (e.g. 30)
+  totalCommissionRate: number; // The total percentage paid by business (e.g. 20%)
   paymentFrequency: PaymentFrequency;
   refundPolicy: 'FINAL_UPON_PAYMENT' | 'CLAWBACK_30_DAYS';
   contactPhone: string;
   status: 'PENDING' | 'ACTIVE' | 'COMPLETED';
   createdAt: string;
+  
+  // Compliance & Validation
+  validationMethod: string; // How the business validates the sale (e.g. "Shopify Dashboard")
+  advertisingGuidelines: string; // Dos
+  prohibitedActs: string; // Don'ts (Health claims, etc)
 }
 
 export interface AffiliateLink {
   id: string;
   campaignId: string;
   creatorId: string;
-  code: string;
-  generatedUrl: string; // This is the BRIDGE url shared by creator
+  creatorName: string; // Cache for UI
+  code: string; // The code the business assigned
+  destinationUrl: string; // The full link provided by business
   clicks: number;
+  status: 'PENDING_ASSIGNMENT' | 'ACTIVE' | 'REVOKED';
 }
 
 export interface SaleRecord {
@@ -65,8 +72,8 @@ export interface SaleRecord {
   
   // Financials
   totalCommission: number;
-  platformFee: number; // 1/3
-  creatorPay: number; // 2/3
+  platformFee: number; // 30%
+  creatorPay: number; // 70%
   
   // Payout Status
   expectedPayoutDate: string;
