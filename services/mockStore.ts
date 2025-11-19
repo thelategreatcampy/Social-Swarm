@@ -39,6 +39,7 @@ class MockStore {
            creatorPay: 20.00,
            status: 'PAID',
            platformFeePaid: true,
+           platformFeeTxId: 'tx_plat_demo_1',
            creatorPayTxId: 'demo_pay_123'
         },
         {
@@ -134,6 +135,10 @@ class MockStore {
       return this.campaigns;
   }
 
+  getCampaignById(id: string): Campaign | undefined {
+    return this.campaigns.find(c => c.id === id);
+  }
+
   // Link Methods
   createLink(link: AffiliateLink): void {
       this.affiliateLinks.push(link);
@@ -142,6 +147,22 @@ class MockStore {
 
   getCreatorLinks(creatorId: string): AffiliateLink[] {
       return this.affiliateLinks.filter(l => l.creatorId === creatorId);
+  }
+
+  getLinkByCode(code: string): AffiliateLink | undefined {
+    return this.affiliateLinks.find(l => l.code === code);
+  }
+
+  recordClick(linkId: string): void {
+    const link = this.affiliateLinks.find(l => l.id === linkId);
+    if (link) {
+      link.clicks = (link.clicks || 0) + 1;
+      this.save();
+    }
+  }
+
+  findLinkForRedirect(campaignId: string, creatorId: string): AffiliateLink | undefined {
+     return this.affiliateLinks.find(l => l.campaignId === campaignId && l.creatorId === creatorId);
   }
 
   // Sales Methods

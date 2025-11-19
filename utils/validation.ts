@@ -16,3 +16,7 @@ export const isValidUrl = (url: string): boolean => {
     return false;
   }
 };
+
+export const isValidEmail = (email: string): boolean => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};

@@ -27,6 +27,7 @@ export interface User {
   payoutDetails?: {
     method: 'STRIPE' | 'PAYPAL' | 'CRYPTO' | 'BANK';
     identifier: string;
+    network?: string;
   };
 }
 
