@@ -41,7 +41,7 @@ export const Terms: React.FC = () => {
         <section>
           <h2 className="text-lg text-white font-bold uppercase mb-2 border-l-4 border-neon-green pl-3">3. Tax Liability & Contractor Status</h2>
           <p className="leading-relaxed">
-            <strong>A. Independent Contractors:</strong> All Creators (Netrunners) act as independent contractors. No employment relationship exists between the Creator and Social Swarm or the Business.
+            <strong>A. Independent Contractors:</strong> All Creators (Netrunners) act as independent contractors. No employment relationship exists between the Creator and Social Swarm and the Business.
             <br/>
             <strong>B. Tax Responsibility:</strong> 
             Social Swarm does <u>NOT</u> issue Form 1099 or W-9 documentation. The Business pays the Creator directly via the Platform's interface.
