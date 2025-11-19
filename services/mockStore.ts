@@ -38,7 +38,8 @@ class MockStore {
            platformFee: 10.00,
            creatorPay: 20.00,
            status: 'PAID',
-           platformFeePaid: true
+           platformFeePaid: true,
+           creatorPayTxId: 'demo_pay_123'
         },
         {
            id: 'tx_demo_2',
@@ -144,6 +145,10 @@ class MockStore {
   }
 
   // Sales Methods
+  getSaleById(id: string): SaleRecord | undefined {
+      return this.sales.find(s => s.id === id);
+  }
+
   getCreatorSales(creatorId: string): SaleRecord[] {
       // If user is a demo creator, return all demo sales
       if (this.users.find(u => u.id === creatorId)?.email === 'operative@socialswarm.net') {
@@ -154,13 +159,33 @@ class MockStore {
 
   getAllSales(): SaleRecord[] { return this.sales; }
   
-  // Admin / Vault Stubs
-  getSystemSettings(): SystemSettings { return this.systemSettings; }
-  updateSystemSettings(s: SystemSettings) { this.systemSettings = s; }
-  adminVerifyPlatformFee(id: string) {
+  updateSaleStatus(id: string, status: string, txId?: string) {
+      const s = this.sales.find(x => x.id === id);
+      if(s) {
+          s.status = status as any;
+          if (txId) s.creatorPayTxId = txId;
+          this.save();
+      }
+  }
+
+  markPlatformFeePaid(id: string, txId: string) {
       const s = this.sales.find(x => x.id === id);
       if(s) {
           s.platformFeePaid = true;
+          s.platformFeeTxId = txId;
+          this.save();
+      }
+  }
+
+  // Admin / Vault Stubs
+  getSystemSettings(): SystemSettings { return this.systemSettings; }
+  updateSystemSettings(s: SystemSettings) { this.systemSettings = s; }
+  
+  adminVerifyPlatformFee(id: string, txId?: string) {
+      const s = this.sales.find(x => x.id === id);
+      if(s) {
+          s.platformFeePaid = true;
+          if (txId) s.platformFeeTxId = txId;
           this.save();
       }
   }

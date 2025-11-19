@@ -76,6 +76,7 @@ export interface SaleRecord {
     status: 'PAID' | 'PENDING' | 'DUE' | 'DISPUTED' | 'PAYMENT_SENT';
     platformFeePaid: boolean;
     platformFeeTxId?: string;
+    creatorPayTxId?: string;
 }
 
 export interface AffiliateLink {

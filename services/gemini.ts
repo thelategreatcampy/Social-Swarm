@@ -68,3 +68,19 @@ export const generateAffiliateCode = async (creatorName: string, productName: st
     return (creatorName.substring(0,3) + productName.substring(0,3)).toUpperCase() + Math.floor(Math.random() * 1000);
   }
 };
+
+/**
+ * Generates a formal payment disclaimer.
+ */
+export const generatePaymentDisclaimer = async (businessName: string, creatorName: string): Promise<string> => {
+  try {
+    const client = getAiClient();
+    const response = await client.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: `Write a short, formal legal disclaimer (1 sentence) for a payment from "${businessName}" to "${creatorName}" stating that this transaction is final and for services rendered.`,
+    });
+    return response.text || `Payment from ${businessName} to ${creatorName} for services rendered. Final and non-refundable.`;
+  } catch (e) {
+    return `Payment from ${businessName} to ${creatorName} for services rendered.`;
+  }
+};
