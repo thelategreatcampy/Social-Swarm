@@ -1,93 +1,137 @@
 import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import { Link, useNavigate } from 'react-router-dom';
 import { UserRole } from '../types';
 
 export const Login: React.FC = () => {
+  const navigate = useNavigate();
   const { login } = useAuth();
   const { addToast } = useToast();
-  const navigate = useNavigate();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [adminMode, setAdminMode] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setError('');
     
-    try {
-      const success = await login(email, password);
-      if (success) {
-        addToast('Access Granted. Welcome back.', 'success');
-        // Redirect is handled by effect in protected route or we can force it here
-        // But since we don't know the role easily without the user object (which is async updated)
-        // We might need to wait or rely on the AuthContext state.
-        // However, login returns a boolean, let's check state in a moment or just redirect to /
-        // The ProtectedRoute will redirect to specific dashboard if needed, 
-        // but let's just go to a safe default.
-        navigate('/'); 
-      } else {
-        addToast('Access Denied: Invalid Credentials', 'error');
+    if (email && password) {
+      // Security Check: If trying to use admin email without triggering admin mode, fail silently or generic error
+      if (email.toLowerCase() === 'admin@socialswarm.net' && !adminMode) {
+         setError('ACCESS DENIED: Invalid Credentials.');
+         return;
       }
-    } catch (err) {
-      addToast('System Error during authentication', 'error');
-    } finally {
+
+      setLoading(true);
+      const success = await login(email, password);
       setLoading(false);
+      
+      if (success) {
+        const user = JSON.parse(localStorage.getItem('commish_user') || '{}');
+        
+        if (user.role === UserRole.ADMIN) {
+           navigate('/admin-dashboard');
+        } else if (user.role === UserRole.BUSINESS) {
+           navigate('/business-dashboard');
+        } else {
+           navigate('/creators');
+        }
+      } else {
+        setError('ACCESS DENIED: Invalid Credentials.');
+      }
+    }
+  };
+
+  const toggleSecureChannel = () => {
+    setAdminMode(prev => !prev);
+    if (!adminMode) {
+      addToast("SECURE CHANNEL OPEN", 'error');
     }
   };
 
   return (
-    <div className="min-h-[70vh] flex items-center justify-center px-4">
-      <div className="w-full max-w-md p-8 rounded-xl bg-cyber-dark border border-cyber-gray shadow-[0_0_20px_rgba(0,0,0,0.5)] relative overflow-hidden group">
-         {/* Decorative glow */}
-         <div className="absolute -top-10 -right-10 w-32 h-32 bg-neon-blue/20 blur-3xl rounded-full group-hover:bg-neon-blue/30 transition-all"></div>
+    <div className="min-h-[80vh] flex items-center justify-center px-4 relative">
+      <div className={`max-w-md w-full bg-cyber-gray border-2 p-1 shadow-[0_0_50px_rgba(0,0,0,0.3)] relative transition-all duration-500 ${adminMode ? 'border-neon-red shadow-[0_0_50px_rgba(255,42,42,0.2)]' : 'border-neon-green shadow-[0_0_50px_rgba(57,255,20,0.1)]'}`}>
+        
+        {/* Corner accents */}
+        <div className={`absolute -top-2 -left-2 w-4 h-4 border-t-2 border-l-2 ${adminMode ? 'border-neon-red' : 'border-neon-green'}`}></div>
+        <div className={`absolute -top-2 -right-2 w-4 h-4 border-t-2 border-r-2 ${adminMode ? 'border-neon-red' : 'border-neon-green'}`}></div>
+        <div className={`absolute -bottom-2 -left-2 w-4 h-4 border-b-2 border-l-2 ${adminMode ? 'border-neon-red' : 'border-neon-green'}`}></div>
+        
+        {/* Invisible Admin Trigger Button - Bottom Right Corner */}
+        <div 
+          className="absolute bottom-0 right-0 w-8 h-8 z-50 cursor-default" 
+          onClick={toggleSecureChannel}
+          title="" // No tooltip
+        ></div>
+        
+        <div className={`absolute -bottom-2 -right-2 w-4 h-4 border-b-2 border-r-2 ${adminMode ? 'border-neon-red' : 'border-neon-green'}`}></div>
 
-         <h2 className="text-2xl font-bold text-white mb-2 font-mono text-center tracking-wider">ACCESS_TERMINAL</h2>
-         <p className="text-center text-slate-400 text-sm mb-8 font-mono">Please identify yourself.</p>
+        <div className="bg-black/50 p-8 backdrop-blur-sm">
+          <div className="text-center mb-8 border-b border-gray-800 pb-4">
+            <h1 className={`text-3xl font-display font-bold tracking-widest mb-1 transition-colors ${adminMode ? 'text-neon-red' : 'text-white'}`}>
+              {adminMode ? 'OVERSEER PORTAL' : 'ACCESS PORTAL'}
+            </h1>
+            <p className={`font-mono text-xs ${adminMode ? 'text-neon-red animate-pulse' : 'text-neon-green'}`}>
+              {adminMode ? 'ROOT CREDENTIALS REQUIRED' : 'SECURE CONNECTION REQUIRED'}
+            </p>
+          </div>
 
-         <form onSubmit={handleLogin} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6 font-mono">
             <div>
-              <label className="block text-xs font-mono text-neon-blue mb-1 uppercase">Email_Address</label>
+              <label className={`block text-xs mb-2 uppercase tracking-wider ${adminMode ? 'text-neon-red' : 'text-neon-green'}`}>
+                >> {adminMode ? 'Root Identity' : 'Identity String'}
+              </label>
               <input 
                 type="email" 
+                required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-black/50 border border-slate-700 rounded p-3 text-white focus:border-neon-blue focus:ring-1 focus:ring-neon-blue focus:outline-none transition-all font-mono"
-                placeholder="operative@socialswarm.net"
-                required
+                className={`w-full px-4 py-3 bg-black border text-white focus:ring-1 focus:outline-none transition-colors placeholder-gray-800 ${adminMode ? 'border-red-900 focus:border-neon-red focus:ring-neon-red' : 'border-gray-700 focus:border-neon-green focus:ring-neon-green'}`}
+                placeholder="USER@NET.LOC" 
               />
-            </div>
-
-            <div>
-              <label className="block text-xs font-mono text-neon-blue mb-1 uppercase">Passcode</label>
-              <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-black/50 border border-slate-700 rounded p-3 text-white focus:border-neon-blue focus:ring-1 focus:ring-neon-blue focus:outline-none transition-all font-mono"
-                placeholder="••••••••"
-                required
-              />
-            </div>
-
-            <Button type="submit" loading={loading} className="w-full bg-neon-blue border-none text-black hover:bg-white">
-              AUTHENTICATE
-            </Button>
-
-            <div className="text-center text-xs font-mono text-slate-500 pt-4">
-               <span className="mr-2">NO_CREDENTIALS?</span>
-               <Link to="/register" className="text-neon-pink hover:underline">REGISTER_NEW_ID</Link>
             </div>
             
-            <div className="mt-4 p-4 bg-slate-900/50 rounded border border-slate-800 text-xs text-slate-500 font-mono">
-              <p className="mb-1 text-slate-400">DEBUG_ACCESS:</p>
-              <p>U: admin@socialswarm.net</p>
-              <p>P: admin123</p>
+            <div>
+              <label className={`block text-xs mb-2 uppercase tracking-wider ${adminMode ? 'text-neon-red' : 'text-neon-green'}`}>
+                >> {adminMode ? 'Master Key' : 'Access Key'}
+              </label>
+              <input 
+                type="password" 
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={`w-full px-4 py-3 bg-black border text-white focus:ring-1 focus:outline-none transition-colors placeholder-gray-800 ${adminMode ? 'border-red-900 focus:border-neon-red focus:ring-neon-red' : 'border-gray-700 focus:border-neon-green focus:ring-neon-green'}`}
+                placeholder="********" 
+              />
             </div>
-         </form>
+
+            {error && (
+              <div className="p-3 bg-red-900/20 text-neon-red text-xs border border-neon-red flex items-center gap-2">
+                <i className="fas fa-exclamation-triangle"></i>
+                {error}
+              </div>
+            )}
+
+            <Button type="submit" className="w-full" variant={adminMode ? 'danger' : 'primary'} loading={loading}>
+              {adminMode ? 'INITIALIZE ROOT' : 'AUTHENTICATE'}
+            </Button>
+
+            {!adminMode && (
+              <div className="text-center pt-4 border-t border-gray-800">
+                <p className="text-xs text-gray-500 mb-2">NEW USER DETECTED?</p>
+                <Link to="/register" className="text-neon-blue hover:text-white uppercase tracking-widest text-sm font-bold">
+                  >> Initialize Registration
+                </Link>
+              </div>
+            )}
+          </form>
+        </div>
       </div>
     </div>
   );

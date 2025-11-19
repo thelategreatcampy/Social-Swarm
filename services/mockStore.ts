@@ -1,46 +1,106 @@
-import { User } from '../types';
+import { User, Campaign, SaleRecord, SystemSettings, UserRole, AffiliateLink } from '../types';
 
 class MockStore {
   private users: User[] = [];
+  private campaigns: Campaign[] = [];
+  private affiliateLinks: AffiliateLink[] = [];
+  
+  // Stub for sales/settings for Admin dashboard compatibility
+  private sales: SaleRecord[] = [];
+  private systemSettings: SystemSettings = {
+      adminPayoutMethod: 'STRIPE_LINK',
+      adminPayoutIdentifier: 'https://stripe.com/pay/social-swarm-treasury'
+  };
+  
+  // Vault stubs
+  public isVaultConnected = false;
+  public vaultPermissionNeeded = false;
+
   private STORAGE_KEY = 'social_swarm_db_users';
+  private CAMPAIGN_KEY = 'social_swarm_db_campaigns';
+  private LINK_KEY = 'social_swarm_db_links';
+  private SALES_KEY = 'social_swarm_db_sales';
 
   constructor() {
     this.load();
+    
+    // Mock data for demo if empty
+    if (this.sales.length === 0) {
+      this.sales = [
+        {
+           id: 'tx_demo_1',
+           campaignId: 'c1',
+           creatorId: 'u_demo_creator',
+           businessId: 'b1',
+           saleDate: new Date().toISOString(),
+           productName: 'Neon Serum',
+           saleAmount: 100.00,
+           platformFee: 10.00,
+           creatorPay: 20.00,
+           status: 'PAID',
+           platformFeePaid: true
+        },
+        {
+           id: 'tx_demo_2',
+           campaignId: 'c2',
+           creatorId: 'u_demo_creator',
+           businessId: 'b2',
+           saleDate: new Date().toISOString(),
+           productName: 'Cyber Deck',
+           saleAmount: 500.00,
+           platformFee: 50.00,
+           creatorPay: 100.00,
+           status: 'PENDING',
+           platformFeePaid: false
+        }
+      ];
+    }
   }
 
   private load() {
     try {
-      const stored = localStorage.getItem(this.STORAGE_KEY);
-      if (stored) {
-        this.users = JSON.parse(stored);
-      }
+      const storedUsers = localStorage.getItem(this.STORAGE_KEY);
+      if (storedUsers) this.users = JSON.parse(storedUsers);
+      
+      const storedCampaigns = localStorage.getItem(this.CAMPAIGN_KEY);
+      if (storedCampaigns) this.campaigns = JSON.parse(storedCampaigns);
+
+      const storedLinks = localStorage.getItem(this.LINK_KEY);
+      if (storedLinks) this.affiliateLinks = JSON.parse(storedLinks);
+      
+      const storedSales = localStorage.getItem(this.SALES_KEY);
+      if (storedSales) this.sales = JSON.parse(storedSales);
+
     } catch (e) {
-      console.error("Failed to load user db", e);
+      console.error("Failed to load db", e);
     }
   }
 
   private save() {
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.users));
+    localStorage.setItem(this.CAMPAIGN_KEY, JSON.stringify(this.campaigns));
+    localStorage.setItem(this.LINK_KEY, JSON.stringify(this.affiliateLinks));
+    localStorage.setItem(this.SALES_KEY, JSON.stringify(this.sales));
   }
 
   ensureAdminExists() {
-     // Ensure the admin user is technically in the "database" for consistency
-     // although AuthContext handles the override directly.
      const adminEmail = 'admin@socialswarm.net';
      if (!this.users.find(u => u.email === adminEmail)) {
-        // We don't necessarily need to force add here if AuthContext handles it, 
-        // but it helps for listing users in Admin Dashboard later.
+        // Admin logic handled primarily in AuthContext
      }
   }
 
   login(email: string, passwordHash: string): User | undefined {
-    // Simple case-insensitive email match
     return this.users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === passwordHash);
   }
 
   register(user: User): void {
      if (this.users.find(u => u.email.toLowerCase() === user.email.toLowerCase())) {
        throw new Error("User already exists");
+     }
+     // Auto-activate store connection for business users for demo/testing purposes
+     if (user.role === UserRole.BUSINESS) {
+         user.storeConnection = { status: 'ACTIVE', platform: 'DEMO_MODE' };
      }
      this.users.push(user);
      this.save();
@@ -58,6 +118,64 @@ class MockStore {
   getAllUsers(): User[] {
     return this.users;
   }
+
+  getUserById(id: string): User | undefined {
+      return this.users.find(u => u.id === id);
+  }
+
+  // Campaign Methods
+  addCampaign(campaign: Campaign): void {
+      this.campaigns.push(campaign);
+      this.save();
+  }
+
+  getCampaigns(): Campaign[] {
+      return this.campaigns;
+  }
+
+  // Link Methods
+  createLink(link: AffiliateLink): void {
+      this.affiliateLinks.push(link);
+      this.save();
+  }
+
+  getCreatorLinks(creatorId: string): AffiliateLink[] {
+      return this.affiliateLinks.filter(l => l.creatorId === creatorId);
+  }
+
+  // Sales Methods
+  getCreatorSales(creatorId: string): SaleRecord[] {
+      // If user is a demo creator, return all demo sales
+      if (this.users.find(u => u.id === creatorId)?.email === 'operative@socialswarm.net') {
+          return this.sales;
+      }
+      return this.sales.filter(s => s.creatorId === creatorId);
+  }
+
+  getAllSales(): SaleRecord[] { return this.sales; }
+  
+  // Admin / Vault Stubs
+  getSystemSettings(): SystemSettings { return this.systemSettings; }
+  updateSystemSettings(s: SystemSettings) { this.systemSettings = s; }
+  adminVerifyPlatformFee(id: string) {
+      const s = this.sales.find(x => x.id === id);
+      if(s) {
+          s.platformFeePaid = true;
+          this.save();
+      }
+  }
+  resolveDispute(id: string, resolution: 'PAID' | 'PENDING') {
+      const s = this.sales.find(x => x.id === id);
+      if(s) {
+          s.status = resolution;
+          this.save();
+      }
+  }
+  banUser(id: string) {
+      this.users = this.users.filter(u => u.id !== id);
+      this.save();
+  }
+  async connectVault(mode: any) { this.isVaultConnected = true; return true; }
 }
 
 export const store = new MockStore();
