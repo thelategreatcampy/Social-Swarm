@@ -2,32 +2,76 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="https://vitejs.dev/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Social Swarm // Network</title>
+    
+    <!-- SEO & Social Sharing -->
+    <title>SOCIAL SWARM // The Commission Protocol</title>
+    <meta name="description" content="The zero-overhead, high-yield network for UGC Creators and Businesses. Pay only for results.">
+    
+    <!-- Open Graph / Social Sharing -->
+    <meta property="og:title" content="SOCIAL SWARM // Decentralized Sales Protocol">
+    <meta property="og:description" content="Join the Swarm. Zero Fees. 100% Performance Based.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://images.unsplash.com/photo-1558494949-efc5e66cdc2f?q=80&w=2670&auto=format&fit=crop">
+    <meta property="og:url" content="https://socialswarm.net">
+
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Cyberpunk Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
     <script>
+      // CRITICAL FIX: Shim process.env to prevent "process is not defined" crashes
+      window.process = {
+        env: {
+          NODE_ENV: 'development',
+          API_KEY: 'INJECTED_BY_ENV' 
+        }
+      };
+      
       tailwind.config = {
         theme: {
           extend: {
             fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-              mono: ['Space Mono', 'monospace'],
-              display: ['Space Mono', 'monospace'],
+              sans: ['Rajdhani', 'sans-serif'],
+              mono: ['"Share Tech Mono"', 'monospace'],
+              display: ['Orbitron', 'sans-serif'],
             },
             colors: {
-              'cyber-black': '#020617', // Very dark slate
-              'cyber-dark': '#0f172a',  // Dark slate
-              'cyber-gray': '#1e293b',
-              'neon-pink': '#ec4899',
-              'neon-blue': '#06b6d4',
-              'neon-green': '#22c55e',
-              'neon-purple': '#a855f7',
-              'neon-red': '#ef4444',
+              cyber: {
+                black: '#050505',
+                dark: '#0a0a0a',
+                gray: '#1a1a1a',
+                slate: '#2a2a2a',
+              },
+              neon: {
+                green: '#39ff14',
+                pink: '#ff00ff',
+                blue: '#00f3ff',
+                yellow: '#fcee0a',
+                red: '#ff2a2a'
+              }
             },
             backgroundImage: {
-              'grid-pattern': "linear-gradient(to right, #1e293b 1px, transparent 1px), linear-gradient(to bottom, #1e293b 1px, transparent 1px)",
+              'grid-pattern': "linear-gradient(to right, #1a1a1a 1px, transparent 1px), linear-gradient(to bottom, #1a1a1a 1px, transparent 1px)",
+            },
+            animation: {
+              'slideIn': 'slideIn 0.3s ease-out forwards',
+              'fadeIn': 'fadeIn 0.5s ease-out forwards',
+            },
+            keyframes: {
+              slideIn: {
+                '0%': { transform: 'translateX(100%)', opacity: '0' },
+                '100%': { transform: 'translateX(0)', opacity: '1' },
+              },
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              }
             }
           }
         }
@@ -35,22 +79,57 @@
     </script>
     <style>
       body {
-        background-color: #020617;
-        color: #e2e8f0;
+        background-color: #050505;
+        color: #e0e0e0;
       }
-      .scanlines {
-        background: linear-gradient(
-          to bottom,
-          rgba(255,255,255,0),
-          rgba(255,255,255,0) 50%,
-          rgba(0,0,0,0.2) 50%,
-          rgba(0,0,0,0.2)
-        );
-        background-size: 100% 4px;
+      
+      /* CRT Scanline Effect */
+      .scanlines::before {
+        content: " ";
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        right: 0;
+        background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+        z-index: 2;
+        background-size: 100% 2px, 3px 100%;
         pointer-events: none;
       }
-      .text-shadow-glow {
-        text-shadow: 0 0 10px rgba(255, 255, 255, 0.7), 0 0 20px rgba(255, 255, 255, 0.5);
+
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0a0a0a; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #333; 
+        border: 1px solid #39ff14;
+        border-radius: 0;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #39ff14; 
+      }
+
+      /* Text Selection */
+      ::selection {
+        background: #ff00ff;
+        color: #fff;
+      }
+      
+      /* Utility for typing effect */
+      .typing-effect {
+        overflow: hidden;
+        white-space: nowrap;
+        animation: typing 2s steps(40, end);
+      }
+      @keyframes typing {
+        from { width: 0 }
+        to { width: 100% }
       }
     </style>
   <script type="importmap">
@@ -61,12 +140,13 @@
     "react": "https://aistudiocdn.com/react@^19.2.0",
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6"
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
+    "react-dom/client": "https://aistudiocdn.com/react-dom@^19.2.0/client"
   }
 }
 </script>
 </head>
-  <body class="antialiased">
-    <div id="root"></div>
+  <body class="bg-cyber-black text-gray-200 antialiased overflow-x-hidden">
+    <div id="root" class="min-h-screen relative"></div>
   </body>
 </html>
