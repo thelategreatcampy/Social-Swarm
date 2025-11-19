@@ -8,18 +8,30 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) => {
-  const { user, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
-    return <div className="flex items-center justify-center min-h-screen text-neon-blue font-mono">INITIALIZING_SECURITY_PROTOCOL...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-cyber-black">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-t-4 border-neon-green rounded-full animate-spin"></div>
+          <p className="text-neon-green font-mono text-xs animate-pulse">VERIFYING CREDENTIALS...</p>
+        </div>
+      </div>
+    );
   }
 
-  if (!user) {
+  if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />;
   }
 
+  // Strict Role Checking
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/" replace />; // Or unauthorized page
+    // Redirect based on their actual role to prevent infinite loops
+    if (user.role === UserRole.ADMIN) return <Navigate to="/admin-dashboard" replace />;
+    if (user.role === UserRole.BUSINESS) return <Navigate to="/business-dashboard" replace />;
+    if (user.role === UserRole.CREATOR) return <Navigate to="/creators" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return <Outlet />;
