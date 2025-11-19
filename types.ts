@@ -14,6 +14,8 @@ export interface User {
   name: string;
   role: UserRole;
   email: string;
+  password?: string; // Added for mock auth
+  companyName?: string; // Added for Business role
 }
 
 export interface JobListing {
