@@ -20,3 +20,7 @@ export const isValidUrl = (url: string): boolean => {
 export const isValidEmail = (email: string): boolean => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 };
+
+export const formatCurrency = (amount: number): number => {
+  return Math.round((amount + Number.EPSILON) * 100) / 100;
+};

@@ -14,6 +14,11 @@ export type PaymentFrequency = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
 export interface StoreConnection {
   status: 'ACTIVE' | 'INACTIVE' | 'PENDING';
   platform?: string;
+  apiKey?: string;
+  storeUrl?: string;
+  lastSyncTime?: string;
+  scopes?: string[];
+  provider?: string;
 }
 
 export interface User {
@@ -25,7 +30,7 @@ export interface User {
   companyName?: string; // Added for Business role
   storeConnection?: StoreConnection; // Added for Watchdog
   payoutDetails?: {
-    method: 'STRIPE' | 'PAYPAL' | 'CRYPTO' | 'BANK';
+    method: 'STRIPE' | 'PAYPAL' | 'CRYPTO' | 'BANK' | 'VENMO' | 'ZELLE' | 'STRIPE_LINK' | 'BANK_WIRE';
     identifier: string;
     network?: string;
   };
@@ -69,15 +74,19 @@ export interface SaleRecord {
     campaignId?: string;
     creatorId?: string;
     businessId?: string;
+    affiliateCode?: string;
     saleDate: string;
     productName: string;
     saleAmount: number;
+    totalCommission: number;
     platformFee: number;
     creatorPay: number;
+    expectedPayoutDate?: string;
     status: 'PAID' | 'PENDING' | 'DUE' | 'DISPUTED' | 'PAYMENT_SENT';
     platformFeePaid: boolean;
     platformFeeTxId?: string;
     creatorPayTxId?: string;
+    verificationMethod?: 'MANUAL_ENTRY' | 'WATCHDOG_AUTO';
 }
 
 export interface AffiliateLink {
