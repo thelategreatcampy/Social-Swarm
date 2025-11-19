@@ -1,27 +1,35 @@
-export const isValidPrice = (price: string): boolean => {
-  const num = parseFloat(price);
-  return !isNaN(num) && num > 0;
+/**
+ * Strict Validation Logic to prevent "Happy Path" crashes.
+ */
+
+export const isValidPrice = (price: string | number): boolean => {
+  const p = typeof price === 'string' ? parseFloat(price) : price;
+  return !isNaN(p) && p > 0 && p < 1000000; // Reasonable limits
 };
 
-export const isValidCommission = (rate: string): boolean => {
-  const num = parseFloat(rate);
-  return !isNaN(num) && num >= 5 && num <= 90;
+export const isValidCommission = (rate: string | number): boolean => {
+  const r = typeof rate === 'string' ? parseFloat(rate) : rate;
+  // Must be positive, and allow room for error, but generally shouldn't exceed 90% 
+  // leaving 10% for the business to actually make money
+  return !isNaN(r) && r >= 5 && r <= 90; 
 };
 
 export const isValidUrl = (url: string): boolean => {
   try {
-    new URL(url);
-    return url.startsWith('http');
+    const parsed = new URL(url);
+    return ['http:', 'https:'].includes(parsed.protocol);
   } catch {
     return false;
   }
 };
 
 export const isValidEmail = (email: string): boolean => {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
 };
 
 export const formatCurrency = (amount: number): number => {
+  // Fix floating point math (0.1 + 0.2)
   return Math.round((amount + Number.EPSILON) * 100) / 100;
 };
 

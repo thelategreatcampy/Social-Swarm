@@ -1,41 +1,88 @@
 import React from 'react';
 
-// Define shared types here to keep things organized
-
 export enum UserRole {
   BUSINESS = 'BUSINESS',
   CREATOR = 'CREATOR',
-  ADMIN = 'ADMIN',
-  GUEST = 'GUEST'
+  ADMIN = 'ADMIN'
 }
 
 export type PaymentFrequency = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
 
-export interface StoreConnection {
-  status: 'ACTIVE' | 'INACTIVE' | 'PENDING';
-  platform?: string;
-  apiKey?: string;
-  storeUrl?: string;
-  lastSyncTime?: string;
-  scopes?: string[];
-  provider?: string;
-}
-
 export interface User {
   id: string;
+  email: string;
+  password?: string;
   name: string;
   role: UserRole;
-  email: string;
-  password?: string; // Added for mock auth
-  companyName?: string; // Added for Business role
-  storeConnection?: StoreConnection; // Added for Watchdog
+  companyName?: string; // Only for Business
   payoutDetails?: {
-    method: 'STRIPE' | 'PAYPAL' | 'CRYPTO' | 'BANK' | 'VENMO' | 'ZELLE' | 'STRIPE_LINK' | 'BANK_WIRE';
-    identifier: string;
-    network?: string;
+    method: 'PAYPAL' | 'VENMO' | 'ZELLE' | 'BANK_WIRE' | 'CRYPTO' | 'STRIPE_LINK';
+    identifier: string; // Email, Handle, Wallet Address, or URL
+    network?: string; // Only for Crypto (ETH, SOL, BTC)
   };
 }
 
+export interface SystemSettings {
+  adminPayoutMethod: 'STRIPE_LINK' | 'CRYPTO' | 'BANK_WIRE';
+  adminPayoutIdentifier: string;
+  adminPayoutNetwork?: string;
+}
+
+export interface Campaign {
+  id: string;
+  businessId: string; // Link to the business user
+  businessName: string;
+  productName: string;
+  productPrice: number;
+  description: string;
+  targetUrl: string; // The actual landing page for the product
+  totalCommissionRate: number; // The total percentage (e.g. 30)
+  paymentFrequency: PaymentFrequency;
+  refundPolicy: 'FINAL_UPON_PAYMENT' | 'CLAWBACK_30_DAYS';
+  contactPhone: string;
+  status: 'PENDING' | 'ACTIVE' | 'COMPLETED';
+  createdAt: string;
+}
+
+export interface AffiliateLink {
+  id: string;
+  campaignId: string;
+  creatorId: string;
+  code: string;
+  generatedUrl: string; // This is the BRIDGE url shared by creator
+  clicks: number;
+}
+
+export interface SaleRecord {
+  id: string;
+  campaignId: string;
+  creatorId: string;
+  businessId: string;
+  affiliateCode: string;
+  productName: string;
+  saleAmount: number;
+  saleDate: string;
+  
+  // Financials
+  totalCommission: number;
+  platformFee: number; // 1/3
+  creatorPay: number; // 2/3
+  
+  // Payout Status
+  expectedPayoutDate: string;
+  status: 'PENDING' | 'DUE' | 'PAYMENT_SENT' | 'PAID' | 'DISPUTED';
+  
+  platformFeePaid?: boolean; // Track if the platform fee was already handled
+  
+  // Evidence
+  platformFeeTxId?: string; // Proof of payment to platform
+  creatorPayTxId?: string; // Proof of payment to creator
+  
+  // Verification Source
+  verificationMethod?: 'MANUAL_ENTRY' | 'CSV_IMPORT';
+}
+
+// UI Helper Types (Retained for Dashboard compatibility)
 export interface JobListing {
   id: string;
   title: string;
@@ -46,60 +93,8 @@ export interface JobListing {
   postedDate: string;
 }
 
-export interface Campaign {
-  id: string;
-  businessId: string;
-  businessName: string;
-  productName: string;
-  productPrice: number;
-  description: string;
-  targetUrl: string;
-  totalCommissionRate: number;
-  paymentFrequency: PaymentFrequency;
-  refundPolicy: string;
-  contactPhone: string;
-  status: 'ACTIVE' | 'PAUSED' | 'ENDED';
-  createdAt: string;
-}
-
 export interface NavItem {
   label: string;
   path: string;
   icon?: React.ComponentType<{ className?: string }>;
-}
-
-// Added for Admin Dashboard compatibility
-export interface SaleRecord {
-    id: string;
-    campaignId?: string;
-    creatorId?: string;
-    businessId?: string;
-    affiliateCode?: string;
-    saleDate: string;
-    productName: string;
-    saleAmount: number;
-    totalCommission: number;
-    platformFee: number;
-    creatorPay: number;
-    expectedPayoutDate?: string;
-    status: 'PAID' | 'PENDING' | 'DUE' | 'DISPUTED' | 'PAYMENT_SENT';
-    platformFeePaid: boolean;
-    platformFeeTxId?: string;
-    creatorPayTxId?: string;
-    verificationMethod?: 'MANUAL_ENTRY' | 'WATCHDOG_AUTO';
-}
-
-export interface AffiliateLink {
-  id: string;
-  campaignId: string;
-  creatorId: string;
-  code: string;
-  generatedUrl: string;
-  clicks: number;
-}
-
-export interface SystemSettings {
-    adminPayoutMethod: 'STRIPE_LINK' | 'CRYPTO' | 'BANK_WIRE';
-    adminPayoutNetwork?: string;
-    adminPayoutIdentifier: string;
 }

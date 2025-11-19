@@ -81,42 +81,6 @@ export const Landing: React.FC = () => {
         </div>
       </section>
 
-      {/* Trust Protocol - Watchdog Explanation */}
-      <section className="py-20 bg-cyber-dark border-b border-gray-800">
-         <div className="max-w-7xl mx-auto px-4">
-            <div className="bg-black border border-neon-blue p-8 md:p-12 relative overflow-hidden">
-               <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-r from-transparent via-neon-blue to-transparent animate-slideIn"></div>
-               <div className="flex flex-col md:flex-row items-center gap-12">
-                  <div className="md:w-1/2">
-                     <div className="flex items-center gap-4 mb-4">
-                        <i className="fas fa-shield-alt text-4xl text-neon-blue"></i>
-                        <h3 className="text-2xl font-display font-bold text-white uppercase tracking-widest">Non-Custodial Architecture</h3>
-                     </div>
-                     <h4 className="text-neon-blue font-mono text-lg mb-4">"How do I know my funds are safe?"</h4>
-                     <p className="text-gray-400 font-mono leading-relaxed">
-                        Social Swarm operates on a strict <span className="text-white font-bold">Read-Only Scope</span>.
-                        <br/><br/>
-                        When you connect your store, our API token is cryptographically restricted to <strong>viewing orders</strong> only. 
-                        <br/><br/>
-                        We physically <strong>cannot</strong> move your money, edit your products, or touch your inventory. You retain 100% custody of your funds at all times, manually releasing commissions only after sales are verified.
-                     </p>
-                  </div>
-                  <div className="md:w-1/2 relative">
-                      <div className="border border-gray-700 bg-gray-900 p-6 font-mono text-xs">
-                         <p className="text-gray-500 mb-2">>> SECURITY AUDIT</p>
-                         <p className="text-neon-green flex justify-between"><span>ACCESS_READ_ORDERS</span> <span>[GRANTED]</span></p>
-                         <p className="text-neon-green flex justify-between"><span>ACCESS_READ_PRODUCTS</span> <span>[GRANTED]</span></p>
-                         <div className="border-t border-gray-800 my-2"></div>
-                         <p className="text-red-500 flex justify-between opacity-70"><span>ACCESS_WRITE_ORDERS</span> <span>[DENIED]</span></p>
-                         <p className="text-red-500 flex justify-between opacity-70"><span>ACCESS_MANAGE_FUNDS</span> <span>[DENIED]</span></p>
-                         <p className="text-red-500 flex justify-between opacity-70"><span>ACCESS_BANKING_INFO</span> <span>[DENIED]</span></p>
-                      </div>
-                  </div>
-               </div>
-            </div>
-         </div>
-      </section>
-
       {/* Comparison / The Problem */}
       <section className="py-24 bg-cyber-dark relative">
         <div className="max-w-7xl mx-auto px-4">
@@ -172,7 +136,7 @@ export const Landing: React.FC = () => {
                   </li>
                   <li className="flex items-start gap-3">
                     <i className="fas fa-check text-neon-green mt-1"></i>
-                    <span><strong className="text-white">Verified Sales:</strong> Watchdog API guarantees transparency.</span>
+                    <span><strong className="text-white">Trust-Based:</strong> Upload sales data via CSV or manual entry.</span>
                   </li>
                 </ul>
               </div>
@@ -306,7 +270,7 @@ export const Landing: React.FC = () => {
               </div>
               <h3 className="text-2xl font-display text-white mb-2 uppercase">Credits Transfer</h3>
               <p className="text-gray-400 font-mono text-sm leading-relaxed">
-                Payment executed only upon verified transaction. Smart contracts handle the split.
+                Business imports sales data. Smart contracts handle the split. Payment verified.
               </p>
             </div>
           </div>

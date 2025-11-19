@@ -1,4 +1,4 @@
-import { Campaign, SaleRecord, User, UserRole, AffiliateLink, PaymentFrequency, SystemSettings, StoreConnection } from '../types';
+import { Campaign, SaleRecord, User, UserRole, AffiliateLink, PaymentFrequency, SystemSettings } from '../types';
 import { formatCurrency } from '../utils/validation';
 import { generateUUID } from '../utils/security';
 
@@ -71,7 +71,7 @@ const MOCK_SALES: SaleRecord[] = [
     platformFeePaid: true,
     platformFeeTxId: 'tx_mock_123',
     creatorPayTxId: 'tx_mock_456',
-    verificationMethod: 'WATCHDOG_AUTO'
+    verificationMethod: 'CSV_IMPORT'
   }
 ];
 
@@ -357,99 +357,6 @@ class MockStore {
 
   getUserById(id: string): User | undefined { return this.users.find(u => u.id === id); }
 
-  // --- Store Integration (Watchdog) ---
-  connectStore(userId: string, connection: Omit<StoreConnection, 'scopes'>): boolean {
-      const user = this.getUserById(userId);
-      if (user) {
-          // Enforce Read-Only Scopes in Mock
-          const enforcedScopes = [
-              'read_orders', 
-              'read_products', 
-              'read_customers', 
-              'read_script_tags'
-          ];
-          
-          user.storeConnection = {
-              ...connection,
-              scopes: enforcedScopes
-          };
-          this.persist();
-          return true;
-      }
-      return false;
-  }
-
-  syncStoreOrders(userId: string): { count: number, logs: string[] } {
-      const user = this.getUserById(userId);
-      if (!user || !user.storeConnection || user.storeConnection.status !== 'ACTIVE') return { count: 0, logs: ['Connection Inactive'] };
-      
-      const logs: string[] = [];
-      logs.push(`Establishing secure channel to ${user.storeConnection.provider}...`);
-      logs.push(`Authenticating via Read-Only Key [${user.storeConnection.apiKey?.slice(0,4)}****]...`);
-      logs.push(`Scanning ${user.storeConnection.storeUrl} order ledger...`);
-      
-      const campaigns = this.getBusinessCampaigns(userId);
-      let newSalesCount = 0;
-      
-      if (campaigns.length === 0) {
-          logs.push("No active campaigns found to audit.");
-          return { count: 0, logs };
-      }
-
-      // --- FORCE FIND ON FIRST SYNC ---
-      // Logic: If the user has 0 sales but has campaigns, force a "found sale" for demo gratification.
-      const hasPriorSales = this.sales.some(s => s.businessId === userId);
-      const forceFind = !hasPriorSales && campaigns.length > 0;
-
-      // Iterate campaigns to see if we "find" sales
-      campaigns.forEach(campaign => {
-          // Get all links for this campaign
-          const links = this.links.filter(l => l.campaignId === campaign.id);
-          
-          // If no real links exist, mock one temporarily for the force find
-          if (links.length === 0 && forceFind) {
-              links.push({
-                  id: 'temp_link', campaignId: campaign.id, creatorId: 'u_creator_1', code: 'DEMO_CODE_2024', generatedUrl: '', clicks: 0
-              });
-          }
-
-          if (links.length > 0) {
-             // Random chance or forced
-             if (forceFind || Math.random() > 0.7) { 
-                 // Pick a random link
-                 const link = links[Math.floor(Math.random() * links.length)];
-                 const amount = campaign.productPrice; 
-                 
-                 // Check if we recently added a sale to avoid flood in demo
-                 const recentSale = this.sales.find(s => s.affiliateCode === link.code && new Date(s.saleDate).getTime() > Date.now() - 60000);
-                 
-                 if (!recentSale) {
-                     const orderId = `ORD-${Math.floor(Math.random() * 100000)}`;
-                     logs.push(`AUDIT HIT: Order #${orderId} used code [${link.code}]`);
-                     logs.push(`Verifying amount... $${amount.toFixed(2)} matched.`);
-                     
-                     this.recordSale(campaign.id, link.code, amount, 'WATCHDOG_AUTO');
-                     newSalesCount++;
-                 }
-             }
-          }
-      });
-      
-      if (newSalesCount === 0) {
-          logs.push("Ledger Audit Complete: No unreported commissions found.");
-      } else {
-          logs.push(`SYNC COMPLETE: ${newSalesCount} unreported sales captured and recorded.`);
-      }
-      
-      // Update Last Sync
-      if (user.storeConnection) {
-         user.storeConnection.lastSyncTime = new Date().toISOString();
-         this.persist();
-      }
-      
-      return { count: newSalesCount, logs };
-  }
-
   // --- Basic Getters ---
   getAllUsers() { return this.users; }
   getAllSales() { return this.sales; }
@@ -494,20 +401,9 @@ class MockStore {
   recordSale(campaignId: string, affiliateCode: string, actualAmount?: number, verificationMethod: SaleRecord['verificationMethod'] = 'MANUAL_ENTRY'): SaleRecord | null {
     const campaign = this.campaigns.find(c => c.id === campaignId);
     
-    // Demo resilience: If no specific link is found (e.g., forced sync), create a dummy link on the fly to allow the sale to record
+    // Basic validation that code belongs to campaign, but allow import if we can verify code ownership via link
     let link = this.links.find(l => l.code.toUpperCase() === affiliateCode.toUpperCase());
-    if (!link && campaign && verificationMethod === 'WATCHDOG_AUTO') {
-        link = {
-            id: generateUUID(),
-            campaignId: campaign.id,
-            creatorId: 'u_creator_1', // Default to first creator for demo
-            code: affiliateCode,
-            generatedUrl: '',
-            clicks: 0
-        };
-        this.links.push(link);
-    }
-
+    
     if (!campaign || !link || link.campaignId !== campaign.id) return null;
 
     const amount = Math.max(0, actualAmount || campaign.productPrice);
