@@ -1,8 +1,8 @@
-import React, { ErrorInfo, ReactNode } from "react";
+import React, { Component, ErrorInfo, ReactNode } from "react";
 import { Bug } from "lucide-react";
 
 interface Props {
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 interface State {
@@ -10,7 +10,7 @@ interface State {
   error: Error | null;
 }
 
-export class ErrorBoundary extends React.Component<Props, State> {
+export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = {
@@ -27,7 +27,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
     console.error("Uncaught error:", error, errorInfo);
   }
 
-  public render() {
+  public render(): ReactNode {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen bg-cyber-black flex items-center justify-center p-4 relative overflow-hidden">

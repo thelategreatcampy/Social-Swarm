@@ -56,7 +56,6 @@ export const CreatorDashboard: React.FC = () => {
   const getLinkForCampaign = (campaignId: string) => myLinks.find(l => l.campaignId === campaignId);
   
   // CALCULATE ONLY THE CREATOR'S SHARE (70% of the Total Rate) to display as "Commission"
-  // We hide the fact that this is 70% of a larger pie.
   const calculateNetBountyPercentage = (totalRate: number) => (totalRate * 0.7).toFixed(1);
   const calculateCreatorEarnings = (price: number, totalRate: number) => (price * (totalRate / 100) * 0.7);
 
@@ -64,7 +63,6 @@ export const CreatorDashboard: React.FC = () => {
 
   const paidSales = mySales.filter(s => s.status === 'PAID');
   const pendingSales = mySales.filter(s => s.status !== 'PAID');
-  const actionRequiredSales = mySales.filter(s => s.status === 'PAYMENT_SENT');
   const totalPayouts = paidSales.reduce((acc, s) => acc + s.creatorPay, 0);
   const upcomingPayments = pendingSales.reduce((acc, s) => acc + s.creatorPay, 0);
   const missingPayoutInfo = !user.payoutDetails || !user.payoutDetails.identifier;
@@ -82,11 +80,11 @@ export const CreatorDashboard: React.FC = () => {
                   </div>
                   <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
                       <div className="bg-green-900/20 border-l-4 border-green-500 p-4">
-                          <h3 className="text-green-500 font-bold uppercase text-xs mb-2">Advertising Guidelines (DO)</h3>
+                          <h3 className="text-green-500 font-bold uppercase text-xs mb-2">Advertising Guidelines (Approved Actions)</h3>
                           <p className="text-gray-300 text-sm font-mono whitespace-pre-wrap">{selectedCampaign.advertisingGuidelines}</p>
                       </div>
                       <div className="bg-red-900/20 border-l-4 border-red-500 p-4">
-                          <h3 className="text-red-500 font-bold uppercase text-xs mb-2">Prohibited Acts (DON'T)</h3>
+                          <h3 className="text-red-500 font-bold uppercase text-xs mb-2">Prohibited Practices (Restricted Actions)</h3>
                           <p className="text-gray-300 text-sm font-mono whitespace-pre-wrap">{selectedCampaign.prohibitedActs}</p>
                       </div>
                       <div className="bg-black p-4 border border-gray-700">
@@ -101,7 +99,7 @@ export const CreatorDashboard: React.FC = () => {
                       </label>
                       <div className="flex gap-3">
                           <Button variant="secondary" onClick={() => setSelectedCampaign(null)}>Cancel</Button>
-                          <Button disabled={!agreedToGuidelines} onClick={handleRequestLink} loading={loadingCode === selectedCampaign.id}>Request Link</Button>
+                          <Button disabled={!agreedToGuidelines} onClick={handleRequestLink} loading={loadingCode === selectedCampaign.id}>APPLY TO PROMOTE</Button>
                       </div>
                   </div>
               </div>
@@ -197,21 +195,23 @@ export const CreatorDashboard: React.FC = () => {
                                 <p className="text-xs text-neon-green font-bold uppercase tracking-widest">Link Active</p>
                             </div>
                             
-                            {/* Large Copy Button for Mobile Ease */}
+                            {/* LARGE MOBILE-FIRST COPY BUTTON */}
                             <button 
                                 onClick={() => handleCopy(existingLink.destinationUrl, existingLink.id)} 
-                                className={`w-full ${copiedState === existingLink.id ? 'bg-white text-black' : 'bg-neon-green hover:bg-neon-green/90 text-black'} font-bold py-4 px-6 rounded-md flex items-center justify-center gap-3 transition-all transform active:scale-95 shadow-[0_0_20px_rgba(57,255,20,0.4)] border-none outline-none`}
+                                className={`w-full ${copiedState === existingLink.id ? 'bg-white text-black' : 'bg-neon-green hover:bg-neon-green/90 text-black'} font-bold py-5 px-6 rounded-lg flex items-center justify-center gap-3 transition-all transform active:scale-95 shadow-[0_0_25px_rgba(57,255,20,0.4)] border-none outline-none`}
                             >
-                                {copiedState === existingLink.id ? <Check className="text-green-600" size={24} /> : <LinkIcon size={24} />}
-                                <span className="text-sm md:text-base uppercase tracking-widest font-display">
-                                    {copiedState === existingLink.id ? 'COPIED!' : 'COPY AFFILIATE LINK'}
+                                {copiedState === existingLink.id ? <Check className="text-green-600" size={28} /> : <Copy size={28} />}
+                                <span className="text-lg uppercase tracking-widest font-display">
+                                    {copiedState === existingLink.id ? 'COPIED!' : 'COPY LINK'}
                                 </span>
                             </button>
                             
-                            <div className="text-center mt-3">
-                                <p className="text-[10px] text-gray-500 font-mono truncate select-all px-2">
-                                    {existingLink.destinationUrl}
-                                </p>
+                            <div className="text-center mt-3 relative">
+                                <input 
+                                    readOnly
+                                    value={existingLink.destinationUrl}
+                                    className="w-full bg-black/50 border border-gray-700 text-[10px] text-gray-500 font-mono text-center p-2 rounded focus:outline-none focus:border-neon-green select-all cursor-text"
+                                />
                             </div>
                         </div>
                     </div>

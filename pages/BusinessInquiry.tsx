@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { analyzeCommissionOffer } from '../services/gemini';
@@ -28,7 +28,6 @@ export const BusinessInquiry: React.FC = () => {
     prohibitedActs: ''
   });
 
-  const [calculatedTotalRate, setCalculatedTotalRate] = useState<number>(0);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   
@@ -36,16 +35,13 @@ export const BusinessInquiry: React.FC = () => {
   const [agreementText, setAgreementText] = useState('');
   const [loadingAgreement, setLoadingAgreement] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const [agreedLinks, setAgreedLinks] = useState(false);
   const [formErrors, setFormErrors] = useState<string[]>([]);
 
-  useEffect(() => {
-    const base = parseFloat(formData.baseCommissionRate) || 0;
-    let multiplier = 1;
-    if (formData.paymentFrequency === 'MONTHLY') {
-      multiplier = 1.10; 
-    }
-    setCalculatedTotalRate(Math.round(base * multiplier * 100) / 100);
-  }, [formData.baseCommissionRate, formData.paymentFrequency]);
+  // Derived State Calculation (Optimized)
+  const base = parseFloat(formData.baseCommissionRate) || 0;
+  const multiplier = formData.paymentFrequency === 'MONTHLY' ? 1.10 : 1;
+  const calculatedTotalRate = Math.round(base * multiplier * 100) / 100;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -149,7 +145,7 @@ By digitally signing below, the Business acknowledges these terms are binding le
   };
 
   const handleFinalSubmit = () => {
-    if (agreed) {
+    if (agreed && agreedLinks) {
       const newCampaign: Campaign = {
         id: generateUUID(),
         businessId: user?.id || 'temp_biz',
@@ -277,16 +273,16 @@ By digitally signing below, the Business acknowledges these terms are binding le
                 <div className="mb-6">
                     <label className={labelClasses}>Revenue Validation Method</label>
                     <p className="text-[10px] text-gray-400 mb-1">Explain how you track sales from our affiliates (e.g. Shopify Dashboard, Refersion, Custom Script). You must be able to provide this data.</p>
-                    <input required name="validationMethod" placeholder="e.g. Shopify Sales Report by Discount Code" value={formData.validationMethod} onChange={handleChange} className={inputClasses} />
+                    <input required name="validationMethod" placeholder="e.g. Shopify Sales Report by Referral Tag" value={formData.validationMethod} onChange={handleChange} className={inputClasses} />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <label className={labelClasses}>Advertising Guidelines (Dos)</label>
+                        <label className={labelClasses}>Advertising Guidelines (Approved Actions)</label>
                         <textarea required name="advertisingGuidelines" rows={4} placeholder="e.g. Focus on the organic ingredients. Mention the 30-day money back guarantee." value={formData.advertisingGuidelines} onChange={handleChange} className={inputClasses}></textarea>
                     </div>
                     <div>
-                        <label className={`${labelClasses} text-neon-red`}>Prohibited Practices (Don'ts)</label>
+                        <label className={`${labelClasses} text-neon-red`}>Prohibited Practices (Restricted Actions)</label>
                         <textarea required name="prohibitedActs" rows={4} placeholder="e.g. DO NOT make medical claims. DO NOT use false testimonials." value={formData.prohibitedActs} onChange={handleChange} className={`${inputClasses} border-red-900/50 focus:border-neon-red`}></textarea>
                     </div>
                 </div>
@@ -348,16 +344,26 @@ By digitally signing below, the Business acknowledges these terms are binding le
               <div className="text-gray-300 bg-black border border-gray-700 p-4 mb-4 shadow-inner">
                 <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed">{agreementText}</pre>
               </div>
-              <label className="flex items-start gap-3 p-2 cursor-pointer hover:bg-gray-900 transition-colors border border-transparent hover:border-gray-700 bg-red-900/10 border-neon-red/30">
-                <input type="checkbox" className="mt-1 bg-black border-neon-red checked:bg-neon-red" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
-                <span className="text-gray-300 text-xs font-bold">
-                  I, representing {formData.companyName}, accept strict liability for these payments, confirm I have the authority to generate tracking links, and agree to the Non-Bypass clauses.
-                </span>
-              </label>
+              
+              <div className="space-y-4">
+                <label className="flex items-start gap-3 p-2 cursor-pointer hover:bg-gray-900 transition-colors border border-transparent hover:border-gray-700 bg-red-900/10 border-neon-red/30">
+                  <input type="checkbox" className="mt-1 bg-black border-neon-red checked:bg-neon-red" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+                  <span className="text-gray-300 text-xs font-bold">
+                    I, representing {formData.companyName}, accept strict liability for these payments.
+                  </span>
+                </label>
+
+                <label className="flex items-start gap-3 p-2 cursor-pointer hover:bg-gray-900 transition-colors border border-transparent hover:border-gray-700 bg-neon-blue/10 border-neon-blue/30">
+                  <input type="checkbox" className="mt-1 bg-black border-neon-blue checked:bg-neon-blue" checked={agreedLinks} onChange={(e) => setAgreedLinks(e.target.checked)} />
+                  <span className="text-gray-300 text-xs font-bold">
+                    I agree to MANUALLY CREATE and ASSIGN unique affiliate links to all Creators who join my dashboard.
+                  </span>
+                </label>
+              </div>
             </div>
             <div className="p-6 border-t border-gray-800 flex justify-end gap-3 bg-cyber-dark">
               <Button variant="secondary" onClick={() => setShowAgreement(false)}>Abort</Button>
-              <Button disabled={!agreed} variant="danger" onClick={handleFinalSubmit}>Sign & Initialize</Button>
+              <Button disabled={!agreed || !agreedLinks} variant="danger" onClick={handleFinalSubmit}>Sign & Initialize</Button>
             </div>
           </div>
         </div>

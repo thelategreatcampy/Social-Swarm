@@ -218,6 +218,9 @@ class MockStore {
     try { localStorage.setItem('commish_store', dataStr); } catch (e) {}
     try { await saveToIDB('backups', { id: 'master_snapshot', data: state, timestamp: state.timestamp }); } catch (e) {}
     if (this.vaultHandle) this.triggerVaultSave(dataStr);
+
+    // Optimization: Dispatch event so components in the same tab update immediately
+    window.dispatchEvent(new Event('storage'));
   }
 
   async connectVault(mode: 'OPEN' | 'CREATE' | 'RESUME'): Promise<boolean> {
@@ -378,6 +381,26 @@ class MockStore {
     } 
   }
   
+  // NEW: Allow admin to undo a verification (accidental click fix)
+  adminResetPlatformFee(saleId: string) {
+    const s = this.sales.find(s => s.id === saleId);
+    if(s) {
+        s.platformFeePaid = false;
+        s.platformFeeTxId = undefined;
+        this.persist();
+    }
+  }
+
+  // NEW: Allow editing of link details to fix typos
+  updateLinkDetails(linkId: string, newCode: string, newUrl: string) {
+    const link = this.links.find(l => l.id === linkId);
+    if (link) {
+      link.code = newCode;
+      link.destinationUrl = newUrl;
+      this.persist();
+    }
+  }
+  
   addCampaign(campaign: Campaign) { this.campaigns.push(campaign); this.persist(); }
   
   // Updated: Logic for requesting and assigning links
@@ -397,11 +420,12 @@ class MockStore {
      return newLink;
   }
 
-  assignLink(linkId: string, code: string, destinationUrl: string) {
+  assignLink(linkId: string, code: string, destinationUrl: string, discountCode?: string) {
       const link = this.links.find(l => l.id === linkId);
       if (link) {
           link.code = code;
           link.destinationUrl = destinationUrl;
+          if (discountCode) link.discountCode = discountCode;
           link.status = 'ACTIVE';
           this.persist();
       }
@@ -425,7 +449,7 @@ class MockStore {
     const amount = Math.max(0, actualAmount || campaign.productPrice);
     const totalCommission = formatCurrency(amount * (campaign.totalCommissionRate / 100));
 
-    // UPDATED SPLIT LOGIC: 70/30
+    // UPDATED SPLIT LOGIC: 70/30 as requested
     const platformShare = 0.30;
     const creatorShare = 0.70;
 

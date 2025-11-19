@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, TrendingUp, Users, Upload, Copy, Check, ExternalLink } from 'lucide-react';
+import { Plus, TrendingUp, Users, Upload, Copy, Check, ExternalLink, Link as LinkIcon, AlertCircle, Pencil, X, Save } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,9 +17,14 @@ export const BusinessDashboard: React.FC = () => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [myLinks, setMyLinks] = useState<AffiliateLink[]>([]);
-  const [assignInputs, setAssignInputs] = useState<Record<string, {code: string, url: string}>>({});
+  const [assignInputs, setAssignInputs] = useState<Record<string, {code: string, url: string, discountCode?: string}>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showDiscountInput, setShowDiscountInput] = useState<Record<string, boolean>>({});
   
+  // Edit Mode State
+  const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
+  const [editFormData, setEditFormData] = useState({ code: '', url: '' });
+
   useEffect(() => {
     if (user) {
       const refresh = () => {
@@ -33,7 +38,7 @@ export const BusinessDashboard: React.FC = () => {
     }
   }, [user]);
 
-  const handleAssignChange = (linkId: string, field: 'code' | 'url', value: string) => {
+  const handleAssignChange = (linkId: string, field: 'code' | 'url' | 'discountCode', value: string) => {
       setAssignInputs(prev => ({
           ...prev,
           [linkId]: {
@@ -44,13 +49,49 @@ export const BusinessDashboard: React.FC = () => {
   };
 
   const handleSaveLink = (link: AffiliateLink) => {
-      const input = assignInputs[link.id];
+      let input = assignInputs[link.id];
       if (!input || !input.code || !input.url) {
-          addToast('Code and Destination URL required.', 'error');
+          addToast('Tracking ID and Destination URL required.', 'error');
           return;
       }
-      store.assignLink(link.id, input.code, input.url);
+
+      // Logistical Safety: Ensure URL starts with http
+      let safeUrl = input.url.trim();
+      if (!safeUrl.match(/^https?:\/\//)) {
+         safeUrl = 'https://' + safeUrl;
+      }
+
+      store.assignLink(link.id, input.code, safeUrl, input.discountCode);
       addToast('Link assigned to Creator successfully.', 'success');
+      if(user) setMyLinks(store.getBusinessLinks(user.id));
+  };
+
+  // --- EDIT LOGIC ---
+  const startEditing = (link: AffiliateLink) => {
+      setEditingLinkId(link.id);
+      setEditFormData({ code: link.code, url: link.destinationUrl });
+  };
+
+  const cancelEditing = () => {
+      setEditingLinkId(null);
+      setEditFormData({ code: '', url: '' });
+  };
+
+  const saveEditing = (linkId: string) => {
+      if (!editFormData.code || !editFormData.url) {
+          addToast("Cannot save empty fields.", 'error');
+          return;
+      }
+      
+      // Logistical Safety
+      let safeUrl = editFormData.url.trim();
+      if (!safeUrl.match(/^https?:\/\//)) {
+         safeUrl = 'https://' + safeUrl;
+      }
+
+      store.updateLinkDetails(linkId, editFormData.code, safeUrl);
+      addToast("Link details updated.", 'success');
+      setEditingLinkId(null);
       if(user) setMyLinks(store.getBusinessLinks(user.id));
   };
 
@@ -61,6 +102,10 @@ export const BusinessDashboard: React.FC = () => {
       addToast('Link copied to clipboard', 'success');
       setTimeout(() => setCopiedId(null), 2000);
     }
+  };
+
+  const toggleDiscountField = (linkId: string) => {
+      setShowDiscountInput(prev => ({ ...prev, [linkId]: !prev[linkId] }));
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -109,8 +154,8 @@ export const BusinessDashboard: React.FC = () => {
         {/* Dashboard Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Business Command</h1>
-            <p className="text-slate-500">Manage campaigns and upload sales data.</p>
+            <h1 className="text-3xl font-display font-bold text-slate-900 uppercase tracking-wide">Command Center</h1>
+            <p className="text-slate-500 font-mono text-sm">Manage protocol assets and deploy creator links.</p>
           </div>
           <div className="flex gap-3">
             <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.txt" onChange={handleFileUpload} />
@@ -119,55 +164,124 @@ export const BusinessDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Pending Requests Panel - Spot to PROVIDE links */}
+        {/* WORKFLOW STATUS INDICATOR */}
+        <div className="bg-cyber-black text-white p-4 mb-8 border border-neon-blue shadow-lg">
+            <p className="text-xs text-neon-blue font-bold uppercase mb-3">Protocol Sequence // How it Works</p>
+            <div className="flex flex-col md:flex-row justify-between gap-4 text-sm font-mono">
+                <div className="flex-1 flex items-center gap-2 opacity-50">
+                    <span className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-xs">1</span>
+                    <span>Post Product</span>
+                </div>
+                <div className="hidden md:block text-gray-600">→</div>
+                <div className={`flex-1 flex items-center gap-2 ${pendingLinks.length > 0 ? 'text-neon-pink animate-pulse font-bold' : 'opacity-50'}`}>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${pendingLinks.length > 0 ? 'bg-neon-pink text-black' : 'bg-gray-700'}`}>2</span>
+                    <span>Creator Requests Link</span>
+                </div>
+                <div className="hidden md:block text-gray-600">→</div>
+                <div className={`flex-1 flex items-center gap-2 ${pendingLinks.length > 0 ? 'text-white font-bold border-b-2 border-neon-pink pb-1' : 'opacity-50'}`}>
+                    <span className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-xs">3</span>
+                    <span>YOU Assign Link</span>
+                </div>
+                <div className="hidden md:block text-gray-600">→</div>
+                <div className="flex-1 flex items-center gap-2 opacity-50">
+                    <span className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-xs">4</span>
+                    <span>Creator Promotes</span>
+                </div>
+            </div>
+        </div>
+
+        {/* Pending Requests Panel - CRITICAL ACTION ZONE */}
         {pendingLinks.length > 0 && (
-            <div className="bg-white rounded-xl shadow-lg border-l-4 border-neon-pink mb-8 overflow-hidden ring-1 ring-black/5">
-                <div className="p-6 border-b border-slate-100 bg-pink-50/50">
-                    <h2 className="text-lg font-bold text-pink-700 flex items-center gap-2">
-                        <Users size={20} /> 
-                        Assign Affiliate Links ({pendingLinks.length})
-                    </h2>
-                    <p className="text-sm text-pink-600/80 mt-1">
-                        The following creators have applied. You must manually generate and assign their unique tracking links below.
+            <div className="bg-white rounded-xl shadow-2xl border-2 border-neon-pink mb-10 overflow-hidden ring-4 ring-pink-100">
+                <div className="p-6 border-b border-pink-200 bg-pink-50">
+                    <div className="flex items-center gap-3 mb-2">
+                        <AlertCircle className="text-neon-pink animate-bounce" size={24} />
+                        <h2 className="text-xl font-display font-bold text-pink-700 uppercase tracking-wider">
+                             Action Required: Link Assignments ({pendingLinks.length})
+                        </h2>
+                    </div>
+                    <p className="text-sm text-pink-800 font-medium max-w-3xl">
+                        Creators have applied to your campaign. You must generate a unique Affiliate/Tracking Link in your store's backend (Shopify/WooCommerce) and assign it to them below. They cannot start selling until you do this.
                     </p>
                 </div>
-                <div className="p-6 space-y-4 bg-white">
+                <div className="p-6 space-y-6 bg-white">
                     {pendingLinks.map(link => {
                         const campaign = campaigns.find(c => c.id === link.campaignId);
                         return (
-                            <div key={link.id} className="bg-slate-50 p-6 rounded-lg border border-slate-200 flex flex-col lg:flex-row items-start lg:items-center gap-6 shadow-sm">
-                                <div className="w-full lg:w-1/4">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
-                                            {link.creatorName.substring(0,2).toUpperCase()}
-                                        </div>
-                                        <p className="font-bold text-slate-900">{link.creatorName}</p>
+                            <div key={link.id} className="bg-slate-50 p-6 rounded-lg border-2 border-slate-200 hover:border-neon-blue transition-all shadow-sm">
+                                
+                                {/* User Info */}
+                                <div className="flex items-center gap-3 border-b border-slate-200 pb-4 mb-4">
+                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 text-white flex items-center justify-center text-lg font-bold shadow-md">
+                                        {link.creatorName.substring(0,1).toUpperCase()}
                                     </div>
-                                    <p className="text-xs text-slate-500 pl-10">Application for: <span className="font-medium text-slate-700">{campaign?.productName}</span></p>
-                                </div>
-                                <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
                                     <div>
-                                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Assign Discount Code</label>
+                                        <p className="font-bold text-lg text-slate-900">{link.creatorName}</p>
+                                        <p className="text-xs text-slate-500">Applying for Campaign: <span className="font-medium text-slate-900 bg-slate-200 px-2 py-0.5 rounded">{campaign?.productName}</span></p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+                                    {/* Field 1: Affiliate Tracking ID */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
+                                            1. Create & Enter Tracking ID
+                                        </label>
                                         <input 
                                             placeholder="e.g. SARAH20" 
-                                            className="w-full border border-slate-300 p-2.5 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                            className="w-full border-2 border-slate-300 p-3 rounded-md text-sm focus:border-neon-blue focus:ring-0 outline-none transition-all bg-white font-mono"
                                             value={assignInputs[link.id]?.code || ''}
                                             onChange={(e) => handleAssignChange(link.id, 'code', e.target.value)}
                                         />
+                                        <p className="text-[11px] text-slate-500 mt-1">
+                                            Create this code in your Shopify/Store dashboard first. It tracks the sale.
+                                        </p>
                                     </div>
+
+                                    {/* Field 2: Destination URL */}
                                     <div>
-                                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Full Tracking URL</label>
+                                        <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
+                                            2. Enter Full Destination URL
+                                        </label>
                                         <input 
-                                            placeholder="e.g. https://site.com/?ref=sarah" 
-                                            className="w-full border border-slate-300 p-2.5 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                            placeholder="e.g. https://yoursite.com/product?ref=SARAH20" 
+                                            className="w-full border-2 border-slate-300 p-3 rounded-md text-sm focus:border-neon-blue focus:ring-0 outline-none transition-all bg-white font-mono"
                                             value={assignInputs[link.id]?.url || ''}
                                             onChange={(e) => handleAssignChange(link.id, 'url', e.target.value)}
                                         />
+                                        <p className="text-[11px] text-slate-500 mt-1">
+                                            The exact link the creator will share. Verify it works.
+                                        </p>
                                     </div>
                                 </div>
-                                <div className="w-full lg:w-auto flex justify-end">
-                                    <Button size="md" onClick={() => handleSaveLink(link)} className="whitespace-nowrap shadow-md">
-                                        Confirm Assignment
+
+                                {/* Field 3: Optional Discount Code */}
+                                <div className="mt-4 pt-4 border-t border-slate-200">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase">
+                                            3. Discount Code (Optional)
+                                        </label>
+                                        <button 
+                                            onClick={() => toggleDiscountField(link.id)} 
+                                            className="text-xs text-blue-600 hover:underline font-bold"
+                                        >
+                                            {showDiscountInput[link.id] ? 'Hide' : 'Add Discount Code?'}
+                                        </button>
+                                    </div>
+                                    
+                                    {showDiscountInput[link.id] ? (
+                                        <input 
+                                            placeholder="e.g. SARAH20 (If different from ID)" 
+                                            className="w-full md:w-1/2 border border-blue-200 bg-blue-50 p-2.5 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                            value={assignInputs[link.id]?.discountCode || ''}
+                                            onChange={(e) => handleAssignChange(link.id, 'discountCode', e.target.value)}
+                                        />
+                                    ) : null}
+                                </div>
+                                
+                                <div className="flex justify-end pt-6">
+                                    <Button size="md" onClick={() => handleSaveLink(link)} className="shadow-lg w-full md:w-auto bg-neon-green text-black hover:bg-green-400 border-transparent">
+                                        <Check size={18} className="mr-2"/> Activate Creator
                                     </Button>
                                 </div>
                             </div>
@@ -220,7 +334,7 @@ export const BusinessDashboard: React.FC = () => {
                 {activeLinks.length === 0 ? (
                     <div className="p-12 text-center text-slate-500">
                         <Users className="mx-auto h-12 w-12 text-slate-300 mb-3" />
-                        <p>No active affiliates yet. Approve requests above.</p>
+                        <p>No active affiliates yet. Wait for creators to apply.</p>
                     </div>
                 ) : (
                     <table className="min-w-full text-left text-sm">
@@ -228,9 +342,9 @@ export const BusinessDashboard: React.FC = () => {
                             <tr>
                                 <th className="px-6 py-3 font-medium uppercase text-xs tracking-wider">Creator</th>
                                 <th className="px-6 py-3 font-medium uppercase text-xs tracking-wider">Campaign</th>
-                                <th className="px-6 py-3 font-medium uppercase text-xs tracking-wider">Assigned Code</th>
-                                <th className="px-6 py-3 font-medium uppercase text-xs tracking-wider">Tracking Link</th>
-                                <th className="px-6 py-3 font-medium uppercase text-xs tracking-wider">Performance</th>
+                                <th className="px-6 py-3 font-medium uppercase text-xs tracking-wider">Tracking ID</th>
+                                <th className="px-6 py-3 font-medium uppercase text-xs tracking-wider">Destination Link</th>
+                                <th className="px-6 py-3 font-medium uppercase text-xs tracking-wider">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200">
@@ -247,36 +361,79 @@ export const BusinessDashboard: React.FC = () => {
                                     <td className="px-6 py-4 text-slate-600">
                                         {campaigns.find(c => c.id === link.campaignId)?.productName}
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <span className="bg-slate-100 border border-slate-200 rounded px-2 py-1 font-mono text-xs font-bold text-slate-700">
-                                            {link.code}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-2 group">
-                                            <div className="max-w-[200px] truncate text-slate-500 text-xs font-mono bg-slate-50 p-1 rounded border border-transparent group-hover:border-slate-200">
-                                                {link.destinationUrl}
-                                            </div>
-                                            <button 
-                                                onClick={() => handleCopyLink(link.destinationUrl, link.id)}
-                                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-all"
-                                                title="Copy Link"
-                                            >
-                                                {copiedId === link.id ? <Check size={14} /> : <Copy size={14} />}
-                                            </button>
-                                            <a 
-                                                href={link.destinationUrl} 
-                                                target="_blank" 
-                                                rel="noreferrer"
-                                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-all"
-                                            >
-                                                <ExternalLink size={14} />
-                                            </a>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-xs font-medium text-slate-600">
-                                        {link.clicks} Clicks
-                                    </td>
+                                    
+                                    {/* Editable Columns */}
+                                    {editingLinkId === link.id ? (
+                                        <>
+                                            <td className="px-6 py-4">
+                                                <input 
+                                                    className="w-full p-2 border border-blue-300 rounded text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none"
+                                                    value={editFormData.code}
+                                                    onChange={(e) => setEditFormData({...editFormData, code: e.target.value})}
+                                                    placeholder="Tracking ID"
+                                                />
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <input 
+                                                    className="w-full p-2 border border-blue-300 rounded text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none"
+                                                    value={editFormData.url}
+                                                    onChange={(e) => setEditFormData({...editFormData, url: e.target.value})}
+                                                    placeholder="https://..."
+                                                />
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => saveEditing(link.id)} className="p-2 bg-green-100 text-green-700 rounded hover:bg-green-200"><Save size={16} /></button>
+                                                    <button onClick={cancelEditing} className="p-2 bg-red-100 text-red-700 rounded hover:bg-red-200"><X size={16} /></button>
+                                                </div>
+                                            </td>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <td className="px-6 py-4">
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="bg-slate-100 border border-slate-200 rounded px-2 py-1 font-mono text-xs font-bold text-slate-700 inline-block w-fit">
+                                                        ID: {link.code}
+                                                    </span>
+                                                    {link.discountCode && (
+                                                        <span className="bg-blue-50 border border-blue-100 text-blue-600 rounded px-2 py-1 font-mono text-[10px] font-bold inline-block w-fit">
+                                                            CODE: {link.discountCode}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2 group">
+                                                    <div className="max-w-[200px] truncate text-slate-500 text-xs font-mono bg-slate-50 p-1 rounded border border-transparent group-hover:border-slate-200 select-all">
+                                                        {link.destinationUrl}
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => handleCopyLink(link.destinationUrl, link.id)}
+                                                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-all"
+                                                        title="Copy Link"
+                                                    >
+                                                        {copiedId === link.id ? <Check size={14} /> : <Copy size={14} />}
+                                                    </button>
+                                                    <a 
+                                                        href={link.destinationUrl} 
+                                                        target="_blank" 
+                                                        rel="noreferrer"
+                                                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-all"
+                                                    >
+                                                        <ExternalLink size={14} />
+                                                    </a>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <button 
+                                                    onClick={() => startEditing(link)}
+                                                    className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-blue-600 transition-colors"
+                                                >
+                                                    <Pencil size={14} /> Edit
+                                                </button>
+                                            </td>
+                                        </>
+                                    )}
                                 </tr>
                             ))}
                         </tbody>

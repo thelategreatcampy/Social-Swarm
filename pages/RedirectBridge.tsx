@@ -1,12 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { store } from '../services/mockStore';
 
 export const RedirectBridge: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const processedRef = useRef(false);
 
   useEffect(() => {
+    if (processedRef.current) return;
+
     // Support legacy (c+m) for backwards compat if needed, but prioritize 'ref'
     const refCode = searchParams.get('ref');
     const c = searchParams.get('c');
@@ -24,6 +27,7 @@ export const RedirectBridge: React.FC = () => {
     }
 
     if (link) {
+      processedRef.current = true;
       store.recordClick(link.id);
       
       // Fetch the campaign to get the destination URL
@@ -37,9 +41,18 @@ export const RedirectBridge: React.FC = () => {
           finalUrl = `https://${finalUrl.replace(/^[a-z]+:\/\//i, '')}`;
         }
 
-        // Append the affiliate code automatically so the creator gets credit/user gets discount
+        // Construct Query Parameters
         const separator = finalUrl.includes('?') ? '&' : '?';
-        finalUrl = `${finalUrl}${separator}discount=${encodeURIComponent(link.code)}`;
+        
+        // 1. Always append the main Tracking ID (Affiliate ID) as 'ref'
+        let params = `ref=${encodeURIComponent(link.code)}`;
+        
+        // 2. If a separate discount code exists, append it as 'discount'
+        if (link.discountCode) {
+            params += `&discount=${encodeURIComponent(link.discountCode)}`;
+        }
+        
+        finalUrl = `${finalUrl}${separator}${params}`;
         
         console.log(`[RedirectBridge] Jumping to: ${finalUrl}`);
         
@@ -83,7 +96,7 @@ export const RedirectBridge: React.FC = () => {
         
         <div className="mt-4 space-y-1 font-mono text-xs text-neon-green">
            <p className="typing-effect">>> Verifying Click Authenticity...</p>
-           <p className="typing-effect delay-100">>> Attaching Discount Protocol...</p>
+           <p className="typing-effect delay-100">>> Attaching Tracking Protocol...</p>
            <p className="typing-effect delay-200">>> Warping to Destination...</p>
         </div>
       </div>

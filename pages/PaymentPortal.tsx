@@ -161,7 +161,7 @@ export const PaymentPortal: React.FC = () => {
                     {paidPlatform ? <i className="fas fa-check"></i> : '01'}
                   </div>
                   <div>
-                    <h4 className="font-display font-bold text-white uppercase tracking-wide">Platform Fee (33%)</h4>
+                    <h4 className="font-display font-bold text-white uppercase tracking-wide">Platform Fee (30%)</h4>
                     <p className="text-xs font-mono text-gray-500">Sent to Social Swarm Treasury</p>
                   </div>
                 </div>
@@ -211,7 +211,7 @@ export const PaymentPortal: React.FC = () => {
                     {paymentStatus === 'PAID' ? <i className="fas fa-check"></i> : '02'}
                   </div>
                   <div>
-                    <h4 className="font-display font-bold text-white uppercase tracking-wide">Creator Payout (66%)</h4>
+                    <h4 className="font-display font-bold text-white uppercase tracking-wide">Creator Payout (70%)</h4>
                     <p className="text-xs font-mono text-gray-500">Destination: {creator.name}</p>
                   </div>
                 </div>

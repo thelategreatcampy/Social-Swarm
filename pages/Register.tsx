@@ -5,6 +5,19 @@ import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types';
 import { isValidEmail } from '../utils/validation';
 
+const BUSINESS_WARNING = `IRREVOCABLE PAYMENT GUARANTEE & DEBT COLLECTIONS NOTICE:
+1. You acknowledge that any Commission Generated on this platform represents a binding financial debt owed to Social Swarm and the Creator.
+2. MANDATORY COLLECTIONS CLAUSE: You explicitly agree that failure to manually transfer funds within 7 days of a payout cycle closing will result in the immediate transfer of your debt to a 3rd Party Collections Agency.
+3. You agree to be personally liable for all legal fees, collection costs, and interest associated with recovering unpaid commissions.
+4. PLATFORM ROLE: You affirm that Social Swarm is a tracking platform only and holds no funds. You are solely responsible for executing payments.
+5. LINK ASSIGNMENT: You acknowledge that Social Swarm does NOT generate affiliate links for you. You agree to MANUALLY generate unique tracking links/codes in your own system (e.g., Shopify, WooCommerce) and assign them to creators via this dashboard.`;
+
+const CREATOR_WARNING = `PLATFORM NON-LIABILITY & INDEMNIFICATION AGREEMENT:
+1. You acknowledge that Social Swarm is a software provider, not a financial institution or employer.
+2. SOLE LIABILITY CLAUSE: You understand that the Business listed is solely responsible for your payment. Social Swarm is NOT liable for any unpaid commissions or bankruptcy on the part of the business.
+3. You hereby release Social Swarm and its administrators from any financial claims regarding unpaid work. Your legal recourse for non-payment is exclusively against the Business Entity.
+4. You are an Independent Contractor responsible for your own taxes.`;
+
 export const Register: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -97,18 +110,6 @@ export const Register: React.FC = () => {
       setError('REGISTRATION FAILED: USER ALREADY EXISTS');
     }
   };
-
-  const BUSINESS_WARNING = `IRREVOCABLE PAYMENT GUARANTEE & DEBT COLLECTIONS NOTICE:
-1. You acknowledge that any Commission Generated on this platform represents a binding financial debt owed to Social Swarm and the Creator.
-2. MANDATORY COLLECTIONS CLAUSE: You explicitly agree that failure to manually transfer funds within 7 days of a payout cycle closing will result in the immediate transfer of your debt to a 3rd Party Collections Agency.
-3. You agree to be personally liable for all legal fees, collection costs, and interest associated with recovering unpaid commissions.
-4. You affirm that Social Swarm is a tracking platform only and holds no funds. You are solely responsible for executing payments.`;
-
-  const CREATOR_WARNING = `PLATFORM NON-LIABILITY & INDEMNIFICATION AGREEMENT:
-1. You acknowledge that Social Swarm is a software provider, not a financial institution or employer.
-2. SOLE LIABILITY CLAUSE: You understand that the Business listed is solely responsible for your payment. Social Swarm is NOT liable for any unpaid commissions or bankruptcy on the part of the business.
-3. You hereby release Social Swarm and its administrators from any financial claims regarding unpaid work. Your legal recourse for non-payment is exclusively against the Business Entity.
-4. You are an Independent Contractor responsible for your own taxes.`;
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
@@ -215,7 +216,7 @@ export const Register: React.FC = () => {
                     onChange={(e) => setAcceptedTerms(e.target.checked)}
                    />
                    <span className="text-[10px] text-white font-bold uppercase">
-                     I Digitally Sign & Accept {role === UserRole.BUSINESS ? 'Debt Liability' : 'Indemnification'}.
+                     I Digitally Sign & Accept {role === UserRole.BUSINESS ? 'Debt Liability & Link Protocol' : 'Indemnification'}.
                    </span>
                  </label>
                </div>

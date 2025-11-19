@@ -4,6 +4,8 @@ import { store } from '../services/mockStore';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { User, SaleRecord, UserRole, Campaign, SystemSettings } from '../types';
+import { copyToClipboard } from '../utils/security';
+import { RotateCcw } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -23,6 +25,10 @@ export const AdminDashboard: React.FC = () => {
 
   // Treasury Form State
   const [treasuryForm, setTreasuryForm] = useState<SystemSettings>(store.getSystemSettings());
+
+  // Platform Fee Verification State
+  const [verifyModal, setVerifyModal] = useState<{ isOpen: boolean, saleId: string | null }>({ isOpen: false, saleId: null });
+  const [txInput, setTxInput] = useState('');
 
   // Force data refresh
   const refreshData = () => {
@@ -51,10 +57,28 @@ export const AdminDashboard: React.FC = () => {
   }
 
   // --- ACTIONS ---
-  const handleVerifyFee = (saleId: string) => {
-    store.adminVerifyPlatformFee(saleId);
-    addToast("Platform fee marked as verified.", 'success');
-    refreshData();
+  const openVerifyModal = (saleId: string) => {
+    setVerifyModal({ isOpen: true, saleId });
+    setTxInput('');
+  };
+
+  const handleConfirmVerify = () => {
+    if (verifyModal.saleId && txInput.trim()) {
+      store.adminVerifyPlatformFee(verifyModal.saleId, txInput);
+      addToast("Platform fee marked as verified with TX ID.", 'success');
+      setVerifyModal({ isOpen: false, saleId: null });
+      refreshData();
+    } else {
+      addToast("Transaction ID Required for verification.", 'error');
+    }
+  };
+
+  const handleUndoVerify = (saleId: string) => {
+      if (window.confirm("Are you sure you want to UNDO this payment verification? This will revert status to UNPAID.")) {
+          store.adminResetPlatformFee(saleId);
+          addToast("Payment status reverted to Unpaid.", 'info');
+          refreshData();
+      }
   };
 
   const handleResolveDispute = (saleId: string, resolution: 'PAID' | 'PENDING') => {
@@ -72,27 +96,16 @@ export const AdminDashboard: React.FC = () => {
       }
   };
 
+  const handleCopyEmail = async (email: string) => {
+    await copyToClipboard(email);
+    addToast('Email copied to clipboard', 'success');
+  };
+
   const handleSaveTreasury = (e: React.FormEvent) => {
       e.preventDefault();
       store.updateSystemSettings(treasuryForm);
       setSettings(treasuryForm);
       addToast('Treasury Routes Updated', 'success');
-  };
-
-  const handleConnectVault = async (mode: 'CREATE' | 'OPEN' | 'RESUME') => {
-      const success = await store.connectVault(mode);
-      if (success) {
-          setIsVaultConnected(true);
-          setVaultPermissionNeeded(false);
-          addToast("IRON-VAULT CONNECTED: LIVE SYNC ACTIVE", 'success');
-          if (mode === 'OPEN') refreshData(); 
-      } else {
-          if (mode === 'RESUME') {
-              addToast("Resume Failed. Please re-connect manually.", 'error');
-          } else {
-              addToast("Vault Connection Failed. Using Local Storage.", 'info');
-          }
-      }
   };
 
   // --- CALCULATIONS ---
@@ -169,7 +182,7 @@ export const AdminDashboard: React.FC = () => {
                 {/* Finances */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="bg-black border border-neon-blue p-6">
-                         <h3 className="text-neon-blue font-display font-bold uppercase mb-4 text-xl">Platform Revenue (1/3 Split)</h3>
+                         <h3 className="text-neon-blue font-display font-bold uppercase mb-4 text-xl">Platform Revenue (30% Split)</h3>
                          <div className="grid grid-cols-2 gap-4">
                              <div className="p-4 bg-gray-900 border border-gray-800">
                                  <span className="block text-xs text-gray-500 uppercase mb-1">Collected</span>
@@ -182,7 +195,7 @@ export const AdminDashboard: React.FC = () => {
                          </div>
                     </div>
                     <div className="bg-black border border-neon-pink p-6">
-                         <h3 className="text-neon-pink font-display font-bold uppercase mb-4 text-xl">Creator Payouts (2/3 Split)</h3>
+                         <h3 className="text-neon-pink font-display font-bold uppercase mb-4 text-xl">Creator Payouts (70% Split)</h3>
                          <div className="grid grid-cols-2 gap-4">
                              <div className="p-4 bg-gray-900 border border-gray-800">
                                  <span className="block text-xs text-gray-500 uppercase mb-1">Paid</span>
@@ -235,9 +248,23 @@ export const AdminDashboard: React.FC = () => {
                                     </td>
                                     <td className="py-3 px-4">
                                         {sale.platformFeePaid ? (
-                                            <span className="text-neon-green font-bold"><i className="fas fa-check"></i> PAID</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-neon-green font-bold"><i className="fas fa-check"></i> VERIFIED</span>
+                                                <button 
+                                                    onClick={() => handleUndoVerify(sale.id)}
+                                                    className="text-gray-500 hover:text-red-500 transition-colors p-1"
+                                                    title="Undo/Reset Payment Status"
+                                                >
+                                                    <RotateCcw size={14} />
+                                                </button>
+                                            </div>
                                         ) : (
-                                            <button onClick={() => handleVerifyFee(sale.id)} className="text-gray-500 hover:text-white underline">Mark Received</button>
+                                            <button 
+                                                onClick={() => openVerifyModal(sale.id)} 
+                                                className="bg-neon-blue/10 border border-neon-blue text-neon-blue hover:bg-neon-blue hover:text-black px-2 py-1 rounded transition-all text-xs font-bold"
+                                            >
+                                                Mark Received
+                                            </button>
                                         )}
                                     </td>
                                 </tr>
@@ -253,7 +280,7 @@ export const AdminDashboard: React.FC = () => {
             <div className="bg-black border border-white p-8 max-w-2xl">
                  <h3 className="text-white font-display font-bold uppercase mb-6 text-2xl"><i className="fas fa-university mr-2"></i> Central Treasury Configuration</h3>
                  <p className="font-mono text-sm text-gray-400 mb-8 border-l-2 border-neon-blue pl-4">
-                     This is where Businesses will be instructed to send the 33% Platform Fee. Ensure these details are accurate to prevent revenue loss.
+                     This is where Businesses will be instructed to send the 30% Platform Fee. Ensure these details are accurate to prevent revenue loss.
                  </p>
                  
                  <form onSubmit={handleSaveTreasury} className="space-y-6 font-mono">
@@ -262,7 +289,7 @@ export const AdminDashboard: React.FC = () => {
                         <select 
                            className="w-full bg-gray-900 border border-gray-700 p-3 text-white focus:border-neon-blue outline-none"
                            value={treasuryForm.adminPayoutMethod}
-                           onChange={(e) => setTreasuryForm({...treasuryForm, adminPayoutMethod: e.target.value as any})}
+                           onChange={(e) => setTreasuryForm({...treasuryForm, adminPayoutMethod: e.target.value as any, adminPayoutIdentifier: ''})}
                         >
                             <option value="STRIPE_LINK">Stripe Payment Link (Recommended)</option>
                             <option value="CRYPTO">Crypto Wallet Address</option>
@@ -270,30 +297,58 @@ export const AdminDashboard: React.FC = () => {
                         </select>
                     </div>
                     
+                    {/* DYNAMIC FORM FIELDS */}
+                    
+                    {/* Case 1: Crypto */}
                     {treasuryForm.adminPayoutMethod === 'CRYPTO' && (
-                         <div>
-                            <label className="block text-xs text-gray-400 uppercase mb-2">Network</label>
-                            <input 
-                                className="w-full bg-gray-900 border border-gray-700 p-3 text-white focus:border-neon-blue outline-none"
-                                value={treasuryForm.adminPayoutNetwork || ''}
-                                placeholder="e.g. ERC-20 / TRC-20"
-                                onChange={(e) => setTreasuryForm({...treasuryForm, adminPayoutNetwork: e.target.value})}
+                        <div className="p-4 border border-neon-yellow bg-neon-yellow/5 animate-fadeIn">
+                             <div className="mb-4">
+                                <label className="block text-xs text-neon-yellow uppercase mb-2">Blockchain Network</label>
+                                <input 
+                                    className="w-full bg-black border border-gray-700 p-3 text-white focus:border-neon-yellow outline-none"
+                                    value={treasuryForm.adminPayoutNetwork || ''}
+                                    placeholder="e.g. Ethereum (ERC-20) / Solana"
+                                    onChange={(e) => setTreasuryForm({...treasuryForm, adminPayoutNetwork: e.target.value})}
+                                />
+                             </div>
+                             <div>
+                                <label className="block text-xs text-neon-yellow uppercase mb-2">Wallet Address</label>
+                                <input 
+                                   className="w-full bg-black border border-gray-700 p-3 text-white focus:border-neon-yellow outline-none font-mono"
+                                   placeholder="0x..."
+                                   value={treasuryForm.adminPayoutIdentifier}
+                                   onChange={(e) => setTreasuryForm({...treasuryForm, adminPayoutIdentifier: e.target.value})}
+                                />
+                             </div>
+                        </div>
+                    )}
+
+                    {/* Case 2: Bank Wire */}
+                    {treasuryForm.adminPayoutMethod === 'BANK_WIRE' && (
+                        <div className="p-4 border border-white bg-gray-900 animate-fadeIn">
+                            <label className="block text-xs text-white uppercase mb-2">Full Wiring Instructions</label>
+                            <p className="text-[10px] text-gray-400 mb-2">Please include Beneficiary Name, Bank Name, Account Number, Routing/SWIFT Number.</p>
+                            <textarea 
+                               className="w-full bg-black border border-gray-700 p-3 text-white focus:border-white outline-none font-mono h-40"
+                               placeholder={`Beneficiary Name: SOCIAL SWARM LLC\nBank Name: CHASE BANK\nRouting Number: 021000...\nAccount Number: 123456789\nAddress: 123 Wall St, NY`}
+                               value={treasuryForm.adminPayoutIdentifier}
+                               onChange={(e) => setTreasuryForm({...treasuryForm, adminPayoutIdentifier: e.target.value})}
                             />
                         </div>
                     )}
 
-                    <div>
-                        <label className="block text-xs text-gray-400 uppercase mb-2">
-                            {treasuryForm.adminPayoutMethod === 'STRIPE_LINK' ? 'Stripe Buy URL' : 
-                             treasuryForm.adminPayoutMethod === 'CRYPTO' ? 'Wallet Address' : 'Wire Details'}
-                        </label>
-                        <textarea 
-                           className="w-full bg-gray-900 border border-gray-700 p-3 text-white focus:border-neon-blue outline-none"
-                           rows={3}
-                           value={treasuryForm.adminPayoutIdentifier}
-                           onChange={(e) => setTreasuryForm({...treasuryForm, adminPayoutIdentifier: e.target.value})}
-                        />
-                    </div>
+                    {/* Case 3: Stripe Link (Default) */}
+                    {treasuryForm.adminPayoutMethod === 'STRIPE_LINK' && (
+                        <div className="p-4 border border-neon-blue bg-neon-blue/5 animate-fadeIn">
+                            <label className="block text-xs text-neon-blue uppercase mb-2">Stripe Payment Link URL</label>
+                            <input 
+                               className="w-full bg-black border border-gray-700 p-3 text-white focus:border-neon-blue outline-none"
+                               placeholder="https://buy.stripe.com/..."
+                               value={treasuryForm.adminPayoutIdentifier}
+                               onChange={(e) => setTreasuryForm({...treasuryForm, adminPayoutIdentifier: e.target.value})}
+                            />
+                        </div>
+                    )}
 
                     <Button type="submit" variant="primary" className="w-full">Update Treasury Route</Button>
                  </form>
@@ -312,7 +367,16 @@ export const AdminDashboard: React.FC = () => {
                                 <tr key={u.id} className="hover:bg-black/30">
                                     <td className="py-3"><span className={`font-bold ${u.role === 'ADMIN' ? 'text-neon-red' : 'text-neon-green'}`}>{u.role}</span></td>
                                     <td className="py-3">{u.companyName || u.name}</td>
-                                    <td className="py-3">{u.email}</td>
+                                    <td className="py-3 flex items-center gap-2">
+                                      {u.email}
+                                      <button 
+                                        onClick={() => handleCopyEmail(u.email)} 
+                                        className="text-gray-500 hover:text-white"
+                                        title="Copy Email"
+                                      >
+                                        <i className="fas fa-copy"></i>
+                                      </button>
+                                    </td>
                                     <td className="py-3">{u.role !== 'ADMIN' && <button onClick={() => handleBanUser(u.id, u.name)} className="text-red-500 border border-red-500 px-2 hover:bg-red-500 hover:text-white transition-colors">BAN</button>}</td>
                                 </tr>
                             ))}
@@ -359,6 +423,32 @@ export const AdminDashboard: React.FC = () => {
                     </div>
                  ))
                 }
+            </div>
+        )}
+
+        {/* MODAL: VERIFY TX ID */}
+        {verifyModal.isOpen && (
+            <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center">
+                <div className="bg-cyber-gray border border-neon-blue p-8 max-w-md w-full shadow-[0_0_30px_rgba(0,243,255,0.2)]">
+                    <h3 className="text-xl font-display font-bold text-white mb-4 uppercase">Verify Platform Payment</h3>
+                    <p className="text-sm text-gray-400 mb-6 font-mono">Enter the Transaction ID or Reference Number to confirm funds have hit the Treasury.</p>
+                    
+                    <div className="mb-6">
+                        <label className="block text-xs text-neon-blue uppercase mb-2">Transaction Reference ID</label>
+                        <input 
+                            autoFocus
+                            className="w-full bg-black border border-gray-600 p-3 text-white focus:border-neon-blue outline-none font-mono"
+                            placeholder="e.g. STRIPE_ch_123... or TX hash"
+                            value={txInput}
+                            onChange={(e) => setTxInput(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-3">
+                        <Button variant="secondary" onClick={() => setVerifyModal({isOpen: false, saleId: null})}>Cancel</Button>
+                        <Button variant="neon" onClick={handleConfirmVerify}>Confirm & Verify</Button>
+                    </div>
+                </div>
             </div>
         )}
     </div>

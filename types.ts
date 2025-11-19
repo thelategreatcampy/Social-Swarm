@@ -54,7 +54,8 @@ export interface AffiliateLink {
   campaignId: string;
   creatorId: string;
   creatorName: string; // Cache for UI
-  code: string; // The code the business assigned
+  code: string; // The code the business assigned (Tracking ID)
+  discountCode?: string; // Optional separate discount code
   destinationUrl: string; // The full link provided by business
   clicks: number;
   status: 'PENDING_ASSIGNMENT' | 'ACTIVE' | 'REVOKED';
