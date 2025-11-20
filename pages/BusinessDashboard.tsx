@@ -1,11 +1,12 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, TrendingUp, Users, Upload, Copy, Check, ExternalLink, Link as LinkIcon, AlertCircle, Pencil, X, Save } from 'lucide-react';
+import { Plus, TrendingUp, Users, Upload, Copy, Check, ExternalLink, Link as LinkIcon, AlertCircle, Pencil, X, Save, DollarSign, ArrowRight, Wallet, Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { store } from '../services/mockStore';
-import { Campaign, SaleRecord, AffiliateLink } from '../types';
+import { Campaign, SaleRecord, AffiliateLink, User, SystemSettings } from '../types';
 import { parseSalesCSV } from '../utils/validation';
 import { copyToClipboard } from '../utils/security';
 
@@ -17,6 +18,9 @@ export const BusinessDashboard: React.FC = () => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [myLinks, setMyLinks] = useState<AffiliateLink[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [systemSettings, setSystemSettings] = useState<SystemSettings>(store.getSystemSettings());
+  
   const [assignInputs, setAssignInputs] = useState<Record<string, {code: string, url: string, discountCode?: string}>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showDiscountInput, setShowDiscountInput] = useState<Record<string, boolean>>({});
@@ -25,12 +29,22 @@ export const BusinessDashboard: React.FC = () => {
   const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState({ code: '', url: '' });
 
+  // --- Batch Payout State ---
+  const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
+  const [batchPlatformTx, setBatchPlatformTx] = useState('');
+  // This tracks individual payment inputs for creators
+  const [batchCreatorTx, setBatchCreatorTx] = useState<Record<string, string>>({});
+  // This tracks the SINGLE input for the "Mark All Paid" feature
+  const [markAllTx, setMarkAllTx] = useState('');
+
   useEffect(() => {
     if (user) {
       const refresh = () => {
         setCampaigns(store.getBusinessCampaigns(user.id));
         setSales(store.getBusinessSales(user.id));
         setMyLinks(store.getBusinessLinks(user.id));
+        setAllUsers(store.getAllUsers());
+        setSystemSettings(store.getSystemSettings());
       };
       refresh();
       window.addEventListener('storage', refresh);
@@ -145,11 +159,92 @@ export const BusinessDashboard: React.FC = () => {
 
   const triggerImport = () => { fileInputRef.current?.click(); };
   
+  // --- BATCH PAYOUT LOGIC ---
+  const handleBulkPayPlatform = () => {
+    if (!batchPlatformTx.trim()) {
+        addToast('Please enter a Transaction ID or Receipt Number.', 'error');
+        return;
+    }
+    const unpaidFeeSales = sales.filter(s => !s.platformFeePaid).map(s => s.id);
+    if (unpaidFeeSales.length === 0) return;
+    
+    store.markBatchPlatformFee(unpaidFeeSales, batchPlatformTx);
+    addToast('Platform Fees marked as PAID.', 'success');
+    if (user) setSales(store.getBusinessSales(user.id)); // Force Refresh
+  };
+
+  const handleBulkPayCreator = (creatorId: string, saleIds: string[]) => {
+      const tx = batchCreatorTx[creatorId];
+      if (!tx || !tx.trim()) {
+          addToast('Please enter a Transaction ID.', 'error');
+          return;
+      }
+      store.markBatchCreatorPay(saleIds, tx);
+      addToast('Payment marked as SENT.', 'success');
+      if (user) setSales(store.getBusinessSales(user.id));
+      // clear the input for that creator
+      setBatchCreatorTx(prev => ({ ...prev, [creatorId]: '' }));
+  };
+
+  // The "One Click" Mark All as Paid
+  const handleMarkAllCreatorsPaid = (allSaleIds: string[]) => {
+     if (!markAllTx.trim()) {
+         addToast('Please enter the Mass Pay Reference ID (e.g. from PayPal/Bank).', 'error');
+         return;
+     }
+     if (window.confirm("CONFIRM: You have already sent these funds externally? The platform will mark all debts as settled.")) {
+         store.markBatchCreatorPay(allSaleIds, markAllTx);
+         addToast('All pending creator debts marked as SENT.', 'success');
+         if(user) setSales(store.getBusinessSales(user.id));
+         setMarkAllTx('');
+     }
+  };
+
+  const generateCSVForPayout = (payouts: any[]) => {
+      const headers = "Recipient Email,Amount,Currency,Note,Reference ID\n";
+      const rows = payouts.map(p => {
+          const email = p.payoutDetails?.method === 'PAYPAL' ? p.payoutDetails.identifier : (p.payoutDetails?.identifier || 'MISSING_INFO');
+          return `${email},${p.total.toFixed(2)},USD,Commission Payout,${p.saleIds.length}_SALES`;
+      }).join("\n");
+      
+      const blob = new Blob([headers + rows], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `payout_batch_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+  };
+
   const pendingLinks = myLinks.filter(l => l.status === 'PENDING_ASSIGNMENT');
   const activeLinks = myLinks.filter(l => l.status === 'ACTIVE');
 
+  // Calculations for Payout Modal
+  const unpaidPlatformFees = sales.filter(s => !s.platformFeePaid).reduce((acc, s) => acc + s.platformFee, 0);
+  
+  // Group unpaid creator payouts by Creator ID
+  const creatorPayouts = sales
+    .filter(s => s.status === 'PENDING' || s.status === 'DUE' || s.status === 'DISPUTED')
+    .reduce((acc, sale) => {
+        if (!acc[sale.creatorId]) {
+            acc[sale.creatorId] = { total: 0, saleIds: [], creatorName: '', payoutDetails: null };
+        }
+        acc[sale.creatorId].total += sale.creatorPay;
+        acc[sale.creatorId].saleIds.push(sale.id);
+        
+        // Find Creator Details
+        const creator = allUsers.find(u => u.id === sale.creatorId);
+        if (creator) {
+            acc[sale.creatorId].creatorName = creator.name;
+            acc[sale.creatorId].payoutDetails = creator.payoutDetails;
+        }
+        return acc;
+    }, {} as Record<string, { total: number, saleIds: string[], creatorName: string, payoutDetails: any }>);
+
+  const creatorPayoutList = Object.entries(creatorPayouts);
+  const allPendingCreatorSaleIds = creatorPayoutList.flatMap(([_, data]) => data.saleIds);
+
   return (
-    <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8 relative">
       <div className="mx-auto max-w-7xl">
         {/* Dashboard Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
@@ -164,31 +259,184 @@ export const BusinessDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* WORKFLOW STATUS INDICATOR */}
-        <div className="bg-cyber-black text-white p-4 mb-8 border border-neon-blue shadow-lg">
-            <p className="text-xs text-neon-blue font-bold uppercase mb-3">Protocol Sequence // How it Works</p>
-            <div className="flex flex-col md:flex-row justify-between gap-4 text-sm font-mono">
-                <div className="flex-1 flex items-center gap-2 opacity-50">
-                    <span className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-xs">1</span>
-                    <span>Post Product</span>
-                </div>
-                <div className="hidden md:block text-gray-600">→</div>
-                <div className={`flex-1 flex items-center gap-2 ${pendingLinks.length > 0 ? 'text-neon-pink animate-pulse font-bold' : 'opacity-50'}`}>
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${pendingLinks.length > 0 ? 'bg-neon-pink text-black' : 'bg-gray-700'}`}>2</span>
-                    <span>Creator Requests Link</span>
-                </div>
-                <div className="hidden md:block text-gray-600">→</div>
-                <div className={`flex-1 flex items-center gap-2 ${pendingLinks.length > 0 ? 'text-white font-bold border-b-2 border-neon-pink pb-1' : 'opacity-50'}`}>
-                    <span className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-xs">3</span>
-                    <span>YOU Assign Link</span>
-                </div>
-                <div className="hidden md:block text-gray-600">→</div>
-                <div className="flex-1 flex items-center gap-2 opacity-50">
-                    <span className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-xs">4</span>
-                    <span>Creator Promotes</span>
+        {/* --- PAYOUT SETTLEMENT CONSOLE --- */}
+        {/* Trigger Banner */}
+        {(unpaidPlatformFees > 0 || creatorPayoutList.length > 0) && (
+            <div className="bg-cyber-black rounded-xl overflow-hidden shadow-2xl border border-neon-green mb-8 relative group">
+                 <div className="absolute inset-0 bg-grid-pattern opacity-10 pointer-events-none"></div>
+                 <div className="p-6 flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+                     <div className="flex items-center gap-4">
+                         <div className="p-4 bg-neon-green/10 rounded-full border border-neon-green/30 animate-pulse">
+                             <DollarSign className="text-neon-green" size={32} />
+                         </div>
+                         <div>
+                             <h2 className="text-white font-display font-bold text-xl uppercase tracking-widest">Financial Settlement Console</h2>
+                             <p className="text-gray-400 font-mono text-sm">
+                                 Outstanding Balance: <span className="text-white font-bold">${(unpaidPlatformFees + creatorPayoutList.reduce((acc, [_, v]) => acc + v.total, 0)).toFixed(2)}</span>
+                             </p>
+                         </div>
+                     </div>
+                     <Button variant="primary" onClick={() => setIsPayoutModalOpen(true)} className="shadow-[0_0_20px_rgba(57,255,20,0.4)] text-lg px-8 py-4">
+                         OPEN SETTLEMENT CONSOLE
+                     </Button>
+                 </div>
+            </div>
+        )}
+
+        {/* Payout Modal */}
+        {isPayoutModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 overflow-y-auto">
+                <div className="w-full max-w-7xl bg-cyber-gray border border-gray-700 shadow-2xl flex flex-col max-h-[90vh]">
+                    {/* Header */}
+                    <div className="p-6 border-b border-gray-700 flex justify-between items-center bg-black">
+                        <div>
+                            <h2 className="text-2xl font-display font-bold text-white uppercase tracking-widest">Settlement Protocol</h2>
+                            <p className="text-neon-green font-mono text-xs">>> Execute Payments in Batch Sequence</p>
+                        </div>
+                        <button onClick={() => setIsPayoutModalOpen(false)} className="text-gray-500 hover:text-white"><X size={24} /></button>
+                    </div>
+
+                    <div className="flex-grow overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-5 gap-8">
+                        
+                        {/* COLUMN 1: PLATFORM FEES (Left Panel - 2/5 width) */}
+                        <div className="lg:col-span-2 space-y-6 border-r border-gray-700 pr-4">
+                            <div className="flex items-center gap-3 mb-4">
+                                <span className="bg-neon-blue text-black font-bold px-3 py-1 text-sm rounded-sm font-mono">STEP 01</span>
+                                <h3 className="text-white font-bold uppercase">Platform Treasury (30%)</h3>
+                            </div>
+                            <div className="bg-black/50 border border-neon-blue/30 p-6 relative overflow-hidden">
+                                {unpaidPlatformFees <= 0 ? (
+                                    <div className="flex flex-col items-center justify-center h-40 text-neon-green">
+                                        <Check size={48} className="mb-2" />
+                                        <p className="font-mono font-bold">ALL FEES PAID</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <p className="text-gray-400 text-xs font-mono uppercase mb-1">Total Owed to Social Swarm</p>
+                                        <p className="text-4xl font-mono font-bold text-neon-blue mb-6">${unpaidPlatformFees.toFixed(2)}</p>
+                                        
+                                        <div className="space-y-4">
+                                            <div className="bg-gray-900 p-4 border border-gray-700">
+                                                <p className="text-[10px] text-gray-500 uppercase mb-2">Send To ({systemSettings.adminPayoutMethod})</p>
+                                                <div className="flex items-center gap-2">
+                                                    <code className="flex-grow bg-black p-2 text-neon-blue font-mono text-xs break-all border border-gray-800">{systemSettings.adminPayoutIdentifier}</code>
+                                                    <button onClick={() => copyToClipboard(systemSettings.adminPayoutIdentifier)} className="p-2 hover:bg-gray-800 text-white"><Copy size={16} /></button>
+                                                </div>
+                                                <div className="mt-2 text-right">
+                                                    <a href={systemSettings.adminPayoutIdentifier} target="_blank" rel="noreferrer" className="text-xs text-white underline hover:text-neon-blue">
+                                                        Open Payment Link <ExternalLink size={10} className="inline" />
+                                                    </a>
+                                                </div>
+                                            </div>
+
+                                            <div className="border-t border-gray-800 pt-4">
+                                                <label className="block text-xs text-gray-400 uppercase mb-2">Verify Bulk Payment</label>
+                                                <div className="flex gap-2">
+                                                    <input 
+                                                        className="flex-grow bg-black border border-gray-600 text-white px-3 py-2 text-sm font-mono focus:border-neon-blue outline-none"
+                                                        placeholder="Paste One Receipt ID"
+                                                        value={batchPlatformTx}
+                                                        onChange={(e) => setBatchPlatformTx(e.target.value)}
+                                                    />
+                                                    <Button variant="outline" onClick={handleBulkPayPlatform}>Mark Fees Paid</Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* COLUMN 2: CREATOR PAYOUTS (Right Panel - 3/5 width) */}
+                        <div className="lg:col-span-3 space-y-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <span className="bg-neon-pink text-black font-bold px-3 py-1 text-sm rounded-sm font-mono">STEP 02</span>
+                                    <div>
+                                        <h3 className="text-white font-bold uppercase">Creator Payroll (70%)</h3>
+                                        <p className="text-[10px] text-gray-400 font-mono">DIRECT TRANSFER REQUIRED - DO NOT SEND TO PLATFORM</p>
+                                    </div>
+                                </div>
+                                {creatorPayoutList.length > 0 && (
+                                    <button 
+                                        onClick={() => generateCSVForPayout(creatorPayoutList.map(([_, data]) => data))}
+                                        className="flex items-center gap-2 text-xs text-neon-green hover:text-white border border-neon-green hover:bg-neon-green/20 px-3 py-2 transition-all"
+                                    >
+                                        <Download size={14} /> Download Mass Pay CSV
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="bg-black/50 border border-gray-700 p-1 h-[400px] overflow-y-auto custom-scrollbar relative">
+                                {creatorPayoutList.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                                        <Wallet size={48} className="mb-2 opacity-50" />
+                                        <p className="font-mono">NO PENDING PAYOUTS</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2 p-4">
+                                        {creatorPayoutList.map(([creatorId, data]) => (
+                                            <div key={creatorId} className="bg-cyber-gray border border-gray-600 p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-neon-pink transition-colors">
+                                                <div className="flex-grow">
+                                                    <div className="flex justify-between items-start">
+                                                        <h4 className="font-bold text-white">{data.creatorName}</h4>
+                                                        <span className="font-mono font-bold text-neon-pink">${data.total.toFixed(2)}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 text-xs text-gray-400 font-mono mt-1">
+                                                        <span className="bg-gray-800 px-2 py-0.5 text-white">{data.payoutDetails?.method || 'UNKNOWN'}</span>
+                                                        <span className="text-gray-500 truncate max-w-[200px]">{data.payoutDetails?.identifier}</span>
+                                                        <button onClick={() => copyToClipboard(data.payoutDetails?.identifier || '')} className="text-neon-pink hover:text-white"><Copy size={12}/></button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex gap-2 md:w-1/2">
+                                                    <input 
+                                                        className="flex-grow bg-black border border-gray-600 text-white px-2 py-1 text-xs font-mono focus:border-neon-pink outline-none"
+                                                        placeholder="Individual TX ID"
+                                                        value={batchCreatorTx[creatorId] || ''}
+                                                        onChange={(e) => setBatchCreatorTx({...batchCreatorTx, [creatorId]: e.target.value})}
+                                                    />
+                                                    <Button size="sm" variant="secondary" className="whitespace-nowrap" onClick={() => handleBulkPayCreator(creatorId, data.saleIds)}>
+                                                        Mark Sent
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Mass Update Section */}
+                            {creatorPayoutList.length > 0 && (
+                                <div className="border-t-2 border-neon-pink pt-4 mt-4 bg-pink-900/10 p-4">
+                                    <div className="flex items-start gap-2 mb-3">
+                                        <AlertCircle size={20} className="text-neon-pink mt-0.5" />
+                                        <div>
+                                            <h4 className="text-white font-bold text-sm uppercase">Bulk Update: Mark All Paid</h4>
+                                            <p className="text-[11px] text-gray-400 leading-tight">
+                                                Use this ONLY if you used a "Mass Pay" feature (e.g. PayPal Payouts) to send funds to all creators above.
+                                                <br/> <span className="text-neon-pink">You certify that you have sent the funds directly to them.</span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <input 
+                                            className="flex-grow bg-black border border-neon-pink/50 text-white px-4 py-2 text-sm font-mono focus:border-neon-pink outline-none"
+                                            placeholder="Paste 'Mass Pay' Reference ID here..."
+                                            value={markAllTx}
+                                            onChange={(e) => setMarkAllTx(e.target.value)}
+                                        />
+                                        <Button variant="neon" onClick={() => handleMarkAllCreatorsPaid(allPendingCreatorSaleIds)}>
+                                            Confirm All Sent
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
+        )}
 
         {/* Pending Requests Panel - CRITICAL ACTION ZONE */}
         {pendingLinks.length > 0 && (

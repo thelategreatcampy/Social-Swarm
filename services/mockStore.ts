@@ -381,6 +381,32 @@ class MockStore {
     } 
   }
   
+  // NEW: Bulk Platform Fee Verification
+  markBatchPlatformFee(saleIds: string[], txId: string) {
+      let updated = false;
+      this.sales.forEach(s => {
+          if (saleIds.includes(s.id) && !s.platformFeePaid) {
+              s.platformFeePaid = true;
+              s.platformFeeTxId = txId;
+              updated = true;
+          }
+      });
+      if (updated) this.persist();
+  }
+
+  // NEW: Bulk Creator Payout
+  markBatchCreatorPay(saleIds: string[], txId: string) {
+      let updated = false;
+      this.sales.forEach(s => {
+          if (saleIds.includes(s.id)) {
+              s.status = 'PAYMENT_SENT';
+              s.creatorPayTxId = txId;
+              updated = true;
+          }
+      });
+      if (updated) this.persist();
+  }
+
   // NEW: Allow admin to undo a verification (accidental click fix)
   adminResetPlatformFee(saleId: string) {
     const s = this.sales.find(s => s.id === saleId);
